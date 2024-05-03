@@ -13,7 +13,7 @@
 
 #define N 3       // Número de nodos
 #define CLIENTE 0 // Clave para la cola de mensajes de clientes
-#define NODO 1    // Clave para la cola de mensajes internodo
+#define NODO 1000 // Clave para la cola de mensajes internodo
 
 int vector_peticiones[3][N];                                                     // Cola de solicitudes por atender
 int vector_atendidas[3][N];                                                      // Cola de solicitudes atendidas
@@ -32,8 +32,8 @@ struct msg_solicitud
 // Estructura para los mensajes de token
 struct msg_token
 {
-    long mtype;                    // 0 -> token original, 1 -> token copia
-    int id_nodo_origen;            // ID del nodo origen
+    long mtype;                       // 0 -> token original, 1 -> token copia
+    int id_nodo_origen;               // ID del nodo origen
     int vector_atendidas_token[3][N]; // Vector de solicitudes atendidas
 };
 
