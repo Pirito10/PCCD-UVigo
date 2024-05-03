@@ -9,8 +9,6 @@
 #include <stdlib.h>
 #include "lista-testigo-copia.h"
 
-
-int crear_lista();
 int añadir_lista(int id);
 int quitar_lista(int id);
 int lista_vacia();
@@ -65,4 +63,13 @@ int quitar_lista(int id){
     }
     free(nodo_actual);
     return 0;
+}
+
+int lista_vacia(){
+    if(nodo_cabeza == NULL){
+        return 1;
+    }
+    else{
+        return 0;
+    }
 }
