@@ -1,5 +1,4 @@
 /*Crear 3 funciones de lista enlazada:
-    0. Crear lista vacía??¿
     1. Añadir id a la lista
     2. Eliminar elemento
     3. Comprobar que la lista esté vacía
@@ -67,9 +66,9 @@ int quitar_lista(int id){
 
 int lista_vacia(){
     if(nodo_cabeza == NULL){
-        return 1;
+        return 1; //La lista está vacía
     }
     else{
-        return 0;
+        return 0; //La lista no está vacía
     }
 }
