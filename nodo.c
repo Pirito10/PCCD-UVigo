@@ -68,48 +68,6 @@ void enviar_token(int id_nodo_destino, int tipo)
     msgsnd(msgid, &msg_token, sizeof(msg_token), 0);
 }
 
-// Función receptora de mensajes de solicitud
-void *receptor()
-{
-    // Variables para almacenar la información recibida de los mensajes
-    int id_nodo_origen, num_peticion_nodo_origen, prioridad_origen, tipo_origen;
-
-    // Bucle receptor
-    while (1)
-    {
-        // Esperamos a recibir una petición
-        struct msg_solicitud msg_solicitud;
-        int msgid = msgget(NODO + id, 0666);
-        msgrcv(msgid, &msg_solicitud, sizeof(msg_solicitud), 0, 0);
-
-        // Obtenemos los datos del mensaje
-        tipo_origen = msg_solicitud.mtype;                                 // Tipo de mensaje, 0 -> solicitud de un escritor, 1 -> solicitud de un lector, 2 -> devolución de token copia
-        id_nodo_origen = msg_solicitud.id_nodo_origen;                     // ID del nodo solicitante
-        num_peticion_nodo_origen = msg_solicitud.num_peticion_nodo_origen; // Número de petición de solicitud
-        prioridad_origen = msg_solicitud.prioridad_origen;                 // Prioridad de la solicitud
-
-        // Actualizamos el vector de peticiones pendientes
-        vector_peticiones[prioridad_origen][id_nodo_origen] = num_peticion_nodo_origen > vector_peticiones[prioridad_origen][id_nodo_origen] ? num_peticion_nodo_origen : vector_peticiones[prioridad_origen][id_nodo_origen];
-
-        // Si lo que recibimos es la devolución de un token copia, eliminamos el nodo de la lista
-        if (tipo_origen == 2)
-        {
-            eliminar_lista(id_nodo_origen);
-        }
-        // Si recibimos una solicitud de un lector, y ya hay un lector en sección crítica, enviamos un token copia, y añadimos el ID del nodo solicitante a la lista
-        else if (tipo_origen == 1 && sc_lectores == 1)
-        {
-            anadir_lista(id_nodo_origen);
-            enviar_token(id_nodo_origen, 1);
-        }
-        // Si tenemos el testigo, no estamos en la sección crítica y la petición es nueva, pasamos el testigo original
-        else if (token && !seccion_critica && vector_peticiones[prioridad_origen][id_nodo_origen] > vector_atendidas[prioridad_origen][id_nodo_origen])
-        {
-            enviar_token(id_nodo_origen, 0);
-        }
-    }
-}
-
 // Proceso de pagos
 void *pagos()
 {
@@ -591,10 +549,10 @@ void *consultas()
         seccion_critica = 0;
 
         // Si ya no hay lectores en sección crítica (somos el último) lo apuntamos
-        if (lista_vacia())
+        /*if (lista_vacia())
         {
             sc_lectores = 0;
-        }
+        }*/
 
         // Si teníamos un testigo copia, enviamos un mensaje al nodo que nos lo envió para informarle de que hemos terminado
         if (token_lector == 1)
@@ -662,16 +620,52 @@ int main(int argc, char *argv[])
     }
 
     // Creamos el hilo receptor, y un hilo para cada tipo de proceso
-    pthread_t hilo_receptor;
     pthread_t hilo_pagos;
     pthread_t hilo_anulaciones;
     pthread_t hilo_reservas;
     pthread_t hilo_administracion;
     pthread_t hilo_consultas;
-    pthread_create(&hilo_receptor, NULL, receptor, NULL);
     pthread_create(&hilo_pagos, NULL, pagos, NULL);
     pthread_create(&hilo_anulaciones, NULL, anulaciones, NULL);
     pthread_create(&hilo_reservas, NULL, reservas, NULL);
     pthread_create(&hilo_administracion, NULL, administracion, NULL);
     pthread_create(&hilo_consultas, NULL, consultas, NULL);
+
+    // Variables para almacenar la información recibida de los mensajes
+    int id_nodo_origen, num_peticion_nodo_origen, prioridad_origen, tipo_origen;
+
+    // Bucle receptor
+    while (1)
+    {
+        // Esperamos a recibir una petición
+        struct msg_solicitud msg_solicitud;
+        int msgid = msgget(NODO + id, 0666);
+        msgrcv(msgid, &msg_solicitud, sizeof(msg_solicitud), 0, 0);
+
+        // Obtenemos los datos del mensaje
+        tipo_origen = msg_solicitud.mtype;                                 // Tipo de mensaje, 0 -> solicitud de un escritor, 1 -> solicitud de un lector, 2 -> devolución de token copia
+        id_nodo_origen = msg_solicitud.id_nodo_origen;                     // ID del nodo solicitante
+        num_peticion_nodo_origen = msg_solicitud.num_peticion_nodo_origen; // Número de petición de solicitud
+        prioridad_origen = msg_solicitud.prioridad_origen;                 // Prioridad de la solicitud
+
+        // Actualizamos el vector de peticiones pendientes
+        vector_peticiones[prioridad_origen][id_nodo_origen] = num_peticion_nodo_origen > vector_peticiones[prioridad_origen][id_nodo_origen] ? num_peticion_nodo_origen : vector_peticiones[prioridad_origen][id_nodo_origen];
+
+        // Si lo que recibimos es la devolución de un token copia, eliminamos el nodo de la lista
+        if (tipo_origen == 2)
+        {
+            // eliminar_lista(id_nodo_origen);
+        }
+        // Si recibimos una solicitud de un lector, y ya hay un lector en sección crítica, enviamos un token copia, y añadimos el ID del nodo solicitante a la lista
+        else if (tipo_origen == 1 && sc_lectores == 1)
+        {
+            // anadir_lista(id_nodo_origen);
+            enviar_token(id_nodo_origen, 1);
+        }
+        // Si tenemos el testigo, no estamos en la sección crítica y la petición es nueva, pasamos el testigo original
+        else if (token && !seccion_critica && vector_peticiones[prioridad_origen][id_nodo_origen] > vector_atendidas[prioridad_origen][id_nodo_origen])
+        {
+            enviar_token(id_nodo_origen, 0);
+        }
+    }
 }
