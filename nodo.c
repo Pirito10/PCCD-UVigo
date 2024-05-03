@@ -609,7 +609,7 @@ void *consultas()
             int msgid = msgget(NODO + id_nodo_origen, 0666);
             msgsnd(msgid, &msg_solicitud, sizeof(msg_solicitud), 0);
         }
-        // Si teníamos el testigo original, vuscamos si hay algún nodo esperando por el testigo, ordenando por prioridad
+        // Si teníamos el testigo original, buscamos si hay algún nodo esperando por el testigo, ordenando por prioridad
         else
         {
             int token_enviado = 0;
