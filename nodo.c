@@ -214,7 +214,7 @@ void *anulaciones()
         // Esperamos a recibir un mensaje de cliente de tipo anulación
         msgrcv(msgid, &msg_temp, sizeof(msg_temp), 2, 0);
 
-        printf("Un proceso de pagos quiere entrar a la sección crítica...\n");
+        printf("Un proceso de anulaciones quiere entrar a la sección crítica...\n");
 
         // Apuntamos que un proceso de prioridad 0 quiere entrar a la sección crítica
         quiere[prioridad]++;
@@ -311,7 +311,7 @@ void *reservas()
         // Esperamos a recibir un mensaje de cliente de tipo reserva
         msgrcv(msgid, &msg_temp, sizeof(msg_temp), 3, 0);
 
-        printf("Un proceso de pagos quiere entrar a la sección crítica...\n");
+        printf("Un proceso de reservas quiere entrar a la sección crítica...\n");
 
         // Apuntamos que un proceso de prioridad 1 quiere entrar a la sección crítica
         quiere[prioridad]++;
@@ -408,7 +408,7 @@ void *administracion()
         // Esperamos a recibir un mensaje de cliente de tipo administración
         msgrcv(msgid, &msg_temp, sizeof(msg_temp), 4, 0);
 
-        printf("Un proceso de pagos quiere entrar a la sección crítica...\n");
+        printf("Un proceso de administracion quiere entrar a la sección crítica...\n");
 
         // Apuntamos que un proceso de prioridad 1 quiere entrar a la sección crítica
         quiere[prioridad]++;
