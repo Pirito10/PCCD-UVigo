@@ -192,7 +192,7 @@ void *anulaciones()
     while (1)
     {
         // Esperamos a recibir un mensaje de pago
-        msgrcv(msgid, &msg_temp, sizeof(msg_temp), 1, 0); // Esperamos mensaje de cliente de tipo 1
+        msgrcv(msgid, &msg_temp, sizeof(msg_temp), 2, 0); // Esperamos mensaje de cliente de tipo 2
 
         printf("Trabajando...\n");
         getchar();
@@ -270,7 +270,7 @@ void *reservas()
     while (1)
     {
         // Esperamos a recibir un mensaje de pago
-        msgrcv(msgid, &msg_temp, sizeof(msg_temp), 1, 0); // Esperamos mensaje de cliente de tipo 1
+        msgrcv(msgid, &msg_temp, sizeof(msg_temp), 3, 0); // Esperamos mensaje de cliente de tipo 3
 
         printf("Trabajando...\n");
         getchar();
@@ -348,7 +348,7 @@ void *administracion()
     while (1)
     {
         // Esperamos a recibir un mensaje de pago
-        msgrcv(msgid, &msg_temp, sizeof(msg_temp), 1, 0); // Esperamos mensaje de cliente de tipo 1
+        msgrcv(msgid, &msg_temp, sizeof(msg_temp), 4, 0); // Esperamos mensaje de cliente de tipo 4
 
         printf("Trabajando...\n");
         getchar();
@@ -426,7 +426,7 @@ void *consultas()
     while (1)
     {
         // Esperamos a recibir un mensaje de pago
-        msgrcv(msgid, &msg_temp, sizeof(msg_temp), 1, 0); // Esperamos mensaje de cliente de tipo 1
+        msgrcv(msgid, &msg_temp, sizeof(msg_temp), 5, 0); // Esperamos mensaje de cliente de tipo 5
 
         printf("Trabajando...\n");
         getchar();
