@@ -15,11 +15,6 @@ int lista_vacia();
 struct NodoLista *nodo_cabeza = NULL;   //Puntero que apunta al primer nodo de la lista
 
 
-int crear_lista(){
-
-     
-}
-
 int añadir_lista(int id){
     if (nodo_cabeza == NULL){
         struct NodoLista *nodoNuevo = (struct NodoLista *) malloc(sizeof(struct NodoLista));
