@@ -107,48 +107,53 @@ void *receptor()
 // Proceso de pagos
 void *pagos()
 {
+    int prioridad = 0;
     int msgid = msgget(CLIENTE + id, 0666 | IPC_CREAT); // Obtenemos el ID de la cola de mensajes de los clientes
     struct msg_cliente msg_temp;                        // Creamos un struct para almacenar temporalmente el mensaje del cliente
 
     // Bucle principal
     while (1)
     {
-        // Esperamos a recibir un mensaje de pago
-        msgrcv(msgid, &msg_temp, sizeof(msg_temp), 1, 0); // Esperamos mensaje de cliente de tipo 1
+        // Esperamos a recibir un mensaje de cliente de tipo pago
+        msgrcv(msgid, &msg_temp, sizeof(msg_temp), 1, 0);
 
-        printf("Trabajando...\n");
-        getchar();
-        printf("Intentando entrar en la sección crítica...\n");
+        printf("Un proceso de pagos quiere entrar a la sección crítica...\n");
+
+        // Apuntamos que un proceso de prioridad 0 quiere entrar a la sección crítica
+        quiere[prioridad]++;
+
         // Si no tenemos el testigo, se envía una solicitud a cada nodo
         if (!token)
         {
             printf("Petición de token...\n");
 
-            // Establecemos el número de la solicitud
+            // Incrementamos el número de la solicitud
             peticion += 1;
 
             // Creamos el mensaje de solicitud
-            struct msgstruct msg_peticion;
-            msg_peticion.mtype = 2;
-            msg_peticion.id_nodo_origen = id;
-            msg_peticion.num_peticion_nodo_origen = peticion;
+            struct msg_solicitud msg_solicitud;
+            msg_solicitud.mtype = 0; // Solicitud de tipo escritor
+            msg_solicitud.id_nodo_origen = id;
+            msg_solicitud.num_peticion_nodo_origen = peticion;
+            msg_solicitud.prioridad_origen = prioridad;
 
             // Lo enviamos a cada nodo
             for (int i = (id + 1) % N; i != id; i = (i + 1) % N)
             {
-                int msgid = msgget(0x900 + i, 0666);
-                msgsnd(msgid, &msg_peticion, sizeof(msg_peticion), 0);
+                int msgid = msgget(NODO + i, 0666);
+                msgsnd(msgid, &msg_solicitud, sizeof(msg_solicitud), 0);
             }
+
             // Esperamos a recibir el testigo
-            struct msgstruct msg_token;
-            int msgid = msgget(0x900 + id, 0666);
-            msgrcv(msgid, &msg_token, sizeof(msg_token), 1, 0);
+            struct msg_token msg_token;
+            int msgid = msgget(NODO + id, 0666);
+            msgrcv(msgid, &msg_token, sizeof(msg_token), 0, 0);
             printf("Token recibido...\n");
 
             // Actualizamos el vector de solicitudes atendidas con el recibido en el mensaje
             for (int i = 0; i < N; i++)
             {
-                vector_atendidas[i] = msg_token.vector_atendidas_token[i];
+                vector_atendidas[prioridad][i] = msg_token.vector_atendidas_token[prioridad][i];
             }
 
             // Actualizamos el estado del testigo en el nodo
@@ -160,22 +165,36 @@ void *pagos()
 
         // Sección crítica
         printf("Sección crítica...\n");
-        getchar();
+        sleep(2);
         printf("Saliendo de la sección crítica...\n");
 
-        // Añadimos la petición creada a la lista de atendidas
-        vector_atendidas[id] = peticion;
+        // Apuntamos que un proceso de prioridad 0 ya no quiere entrar a la sección crítica
+        quiere[prioridad]--;
+        // Apuntamos que la petición ya está atendida si no quedan más peticiones de igual prioridad en el nodo
+        if (quiere[prioridad] == 0)
+        {
+            vector_atendidas[prioridad][id] = peticion;
+        }
 
         // Actualizamos el estado de la sección crítica en el nodo
         seccion_critica = 0;
 
-        // Buscamos si hay algún nodo esperando por el testigo
-        for (int i = (id + 1) % N; i != id; i = (i + 1) % N)
+        int token_enviado = 0;
+        // Buscamos si hay algún nodo esperando por el testigo, ordenando por prioridad
+        for (int j = 0, j < 3; j++)
         {
-            // Si lo hay, le pasamos el testigo
-            if (vector_peticiones[i] > vector_atendidas[i])
+            for (int i = (id + 1) % N; i != id; i = (i + 1) % N)
             {
-                enviar_token(i);
+                // Si lo hay, le pasamos el testigo
+                if (vector_peticiones[j][i] > vector_atendidas[j][i])
+                {
+                    int token_enviado = 1;
+                    enviar_token(i, 0);
+                    break;
+                }
+            }
+            if (token_enviado)
+            {
                 break;
             }
         }
@@ -185,48 +204,53 @@ void *pagos()
 // Proceso de anulaciones
 void *anulaciones()
 {
-    int msgid = (int)(intptr_t)arg; // Obtenemos el ID de la cola de mensajes de los clientes
-    struct msg_cliente msg_temp;    // Creamos un struct para almacenar temporalmente el mensaje del cliente
+    int prioridad = 0;
+    int msgid = msgget(CLIENTE + id, 0666 | IPC_CREAT); // Obtenemos el ID de la cola de mensajes de los clientes
+    struct msg_cliente msg_temp;                        // Creamos un struct para almacenar temporalmente el mensaje del cliente
 
     // Bucle principal
     while (1)
     {
-        // Esperamos a recibir un mensaje de pago
-        msgrcv(msgid, &msg_temp, sizeof(msg_temp), 2, 0); // Esperamos mensaje de cliente de tipo 2
+        // Esperamos a recibir un mensaje de cliente de tipo anulación
+        msgrcv(msgid, &msg_temp, sizeof(msg_temp), 2, 0);
 
-        printf("Trabajando...\n");
-        getchar();
-        printf("Intentando entrar en la sección crítica...\n");
+        printf("Un proceso de pagos quiere entrar a la sección crítica...\n");
+
+        // Apuntamos que un proceso de prioridad 0 quiere entrar a la sección crítica
+        quiere[prioridad]++;
+
         // Si no tenemos el testigo, se envía una solicitud a cada nodo
         if (!token)
         {
             printf("Petición de token...\n");
 
-            // Establecemos el número de la solicitud
+            // Incrementamos el número de la solicitud
             peticion += 1;
 
             // Creamos el mensaje de solicitud
-            struct msgstruct msg_peticion;
-            msg_peticion.mtype = 2;
-            msg_peticion.id_nodo_origen = id;
-            msg_peticion.num_peticion_nodo_origen = peticion;
+            struct msg_solicitud msg_solicitud;
+            msg_solicitud.mtype = 0; // Solicitud de tipo escritor
+            msg_solicitud.id_nodo_origen = id;
+            msg_solicitud.num_peticion_nodo_origen = peticion;
+            msg_solicitud.prioridad_origen = prioridad;
 
             // Lo enviamos a cada nodo
             for (int i = (id + 1) % N; i != id; i = (i + 1) % N)
             {
-                int msgid = msgget(0x900 + i, 0666);
-                msgsnd(msgid, &msg_peticion, sizeof(msg_peticion), 0);
+                int msgid = msgget(NODO + i, 0666);
+                msgsnd(msgid, &msg_solicitud, sizeof(msg_solicitud), 0);
             }
+
             // Esperamos a recibir el testigo
-            struct msgstruct msg_token;
-            int msgid = msgget(0x900 + id, 0666);
-            msgrcv(msgid, &msg_token, sizeof(msg_token), 1, 0);
+            struct msg_token msg_token;
+            int msgid = msgget(NODO + id, 0666);
+            msgrcv(msgid, &msg_token, sizeof(msg_token), 0, 0);
             printf("Token recibido...\n");
 
             // Actualizamos el vector de solicitudes atendidas con el recibido en el mensaje
             for (int i = 0; i < N; i++)
             {
-                vector_atendidas[i] = msg_token.vector_atendidas_token[i];
+                vector_atendidas[prioridad][i] = msg_token.vector_atendidas_token[prioridad][i];
             }
 
             // Actualizamos el estado del testigo en el nodo
@@ -238,22 +262,36 @@ void *anulaciones()
 
         // Sección crítica
         printf("Sección crítica...\n");
-        getchar();
+        sleep(2);
         printf("Saliendo de la sección crítica...\n");
 
-        // Añadimos la petición creada a la lista de atendidas
-        vector_atendidas[id] = peticion;
+        // Apuntamos que un proceso de prioridad 0 ya no quiere entrar a la sección crítica
+        quiere[prioridad]--;
+        // Apuntamos que la petición ya está atendida si no quedan más peticiones de igual prioridad en el nodo
+        if (quiere[prioridad] == 0)
+        {
+            vector_atendidas[prioridad][id] = peticion;
+        }
 
         // Actualizamos el estado de la sección crítica en el nodo
         seccion_critica = 0;
 
-        // Buscamos si hay algún nodo esperando por el testigo
-        for (int i = (id + 1) % N; i != id; i = (i + 1) % N)
+        int token_enviado = 0;
+        // Buscamos si hay algún nodo esperando por el testigo, ordenando por prioridad
+        for (int j = 0, j < 3; j++)
         {
-            // Si lo hay, le pasamos el testigo
-            if (vector_peticiones[i] > vector_atendidas[i])
+            for (int i = (id + 1) % N; i != id; i = (i + 1) % N)
             {
-                enviar_token(i);
+                // Si lo hay, le pasamos el testigo
+                if (vector_peticiones[j][i] > vector_atendidas[j][i])
+                {
+                    int token_enviado = 1;
+                    enviar_token(i, 0);
+                    break;
+                }
+            }
+            if (token_enviado)
+            {
                 break;
             }
         }
@@ -263,48 +301,53 @@ void *anulaciones()
 // Proceso de reservas
 void *reservas()
 {
-    int msgid = (int)(intptr_t)arg; // Obtenemos el ID de la cola de mensajes de los clientes
-    struct msg_cliente msg_temp;    // Creamos un struct para almacenar temporalmente el mensaje del cliente
+    int prioridad = 1;
+    int msgid = msgget(CLIENTE + id, 0666 | IPC_CREAT); // Obtenemos el ID de la cola de mensajes de los clientes
+    struct msg_cliente msg_temp;                        // Creamos un struct para almacenar temporalmente el mensaje del cliente
 
     // Bucle principal
     while (1)
     {
-        // Esperamos a recibir un mensaje de pago
-        msgrcv(msgid, &msg_temp, sizeof(msg_temp), 3, 0); // Esperamos mensaje de cliente de tipo 3
+        // Esperamos a recibir un mensaje de cliente de tipo reserva
+        msgrcv(msgid, &msg_temp, sizeof(msg_temp), 3, 0);
 
-        printf("Trabajando...\n");
-        getchar();
-        printf("Intentando entrar en la sección crítica...\n");
+        printf("Un proceso de pagos quiere entrar a la sección crítica...\n");
+
+        // Apuntamos que un proceso de prioridad 1 quiere entrar a la sección crítica
+        quiere[prioridad]++;
+
         // Si no tenemos el testigo, se envía una solicitud a cada nodo
         if (!token)
         {
             printf("Petición de token...\n");
 
-            // Establecemos el número de la solicitud
+            // Incrementamos el número de la solicitud
             peticion += 1;
 
             // Creamos el mensaje de solicitud
-            struct msgstruct msg_peticion;
-            msg_peticion.mtype = 2;
-            msg_peticion.id_nodo_origen = id;
-            msg_peticion.num_peticion_nodo_origen = peticion;
+            struct msg_solicitud msg_solicitud;
+            msg_solicitud.mtype = 0; // Solicitud de tipo escritor
+            msg_solicitud.id_nodo_origen = id;
+            msg_solicitud.num_peticion_nodo_origen = peticion;
+            msg_solicitud.prioridad_origen = prioridad;
 
             // Lo enviamos a cada nodo
             for (int i = (id + 1) % N; i != id; i = (i + 1) % N)
             {
-                int msgid = msgget(0x900 + i, 0666);
-                msgsnd(msgid, &msg_peticion, sizeof(msg_peticion), 0);
+                int msgid = msgget(NODO + i, 0666);
+                msgsnd(msgid, &msg_solicitud, sizeof(msg_solicitud), 0);
             }
+
             // Esperamos a recibir el testigo
-            struct msgstruct msg_token;
-            int msgid = msgget(0x900 + id, 0666);
-            msgrcv(msgid, &msg_token, sizeof(msg_token), 1, 0);
+            struct msg_token msg_token;
+            int msgid = msgget(NODO + id, 0666);
+            msgrcv(msgid, &msg_token, sizeof(msg_token), 0, 0);
             printf("Token recibido...\n");
 
             // Actualizamos el vector de solicitudes atendidas con el recibido en el mensaje
             for (int i = 0; i < N; i++)
             {
-                vector_atendidas[i] = msg_token.vector_atendidas_token[i];
+                vector_atendidas[prioridad][i] = msg_token.vector_atendidas_token[prioridad][i];
             }
 
             // Actualizamos el estado del testigo en el nodo
@@ -316,22 +359,36 @@ void *reservas()
 
         // Sección crítica
         printf("Sección crítica...\n");
-        getchar();
+        sleep(2);
         printf("Saliendo de la sección crítica...\n");
 
-        // Añadimos la petición creada a la lista de atendidas
-        vector_atendidas[id] = peticion;
+        // Apuntamos que un proceso de prioridad 1 ya no quiere entrar a la sección crítica
+        quiere[prioridad]--;
+        // Apuntamos que la petición ya está atendida si no quedan más peticiones de igual prioridad en el nodo
+        if (quiere[prioridad] == 0)
+        {
+            vector_atendidas[prioridad][id] = peticion;
+        }
 
         // Actualizamos el estado de la sección crítica en el nodo
         seccion_critica = 0;
 
-        // Buscamos si hay algún nodo esperando por el testigo
-        for (int i = (id + 1) % N; i != id; i = (i + 1) % N)
+        int token_enviado = 0;
+        // Buscamos si hay algún nodo esperando por el testigo, ordenando por prioridad
+        for (int j = 0, j < 3; j++)
         {
-            // Si lo hay, le pasamos el testigo
-            if (vector_peticiones[i] > vector_atendidas[i])
+            for (int i = (id + 1) % N; i != id; i = (i + 1) % N)
             {
-                enviar_token(i);
+                // Si lo hay, le pasamos el testigo
+                if (vector_peticiones[j][i] > vector_atendidas[j][i])
+                {
+                    int token_enviado = 1;
+                    enviar_token(i, 0);
+                    break;
+                }
+            }
+            if (token_enviado)
+            {
                 break;
             }
         }
@@ -341,48 +398,53 @@ void *reservas()
 // Proceso de administración
 void *administracion()
 {
-    int msgid = (int)(intptr_t)arg; // Obtenemos el ID de la cola de mensajes de los clientes
-    struct msg_cliente msg_temp;    // Creamos un struct para almacenar temporalmente el mensaje del cliente
+    int prioridad = 1;
+    int msgid = msgget(CLIENTE + id, 0666 | IPC_CREAT); // Obtenemos el ID de la cola de mensajes de los clientes
+    struct msg_cliente msg_temp;                        // Creamos un struct para almacenar temporalmente el mensaje del cliente
 
     // Bucle principal
     while (1)
     {
-        // Esperamos a recibir un mensaje de pago
-        msgrcv(msgid, &msg_temp, sizeof(msg_temp), 4, 0); // Esperamos mensaje de cliente de tipo 4
+        // Esperamos a recibir un mensaje de cliente de tipo administración
+        msgrcv(msgid, &msg_temp, sizeof(msg_temp), 4, 0);
 
-        printf("Trabajando...\n");
-        getchar();
-        printf("Intentando entrar en la sección crítica...\n");
+        printf("Un proceso de pagos quiere entrar a la sección crítica...\n");
+
+        // Apuntamos que un proceso de prioridad 1 quiere entrar a la sección crítica
+        quiere[prioridad]++;
+
         // Si no tenemos el testigo, se envía una solicitud a cada nodo
         if (!token)
         {
             printf("Petición de token...\n");
 
-            // Establecemos el número de la solicitud
+            // Incrementamos el número de la solicitud
             peticion += 1;
 
             // Creamos el mensaje de solicitud
-            struct msgstruct msg_peticion;
-            msg_peticion.mtype = 2;
-            msg_peticion.id_nodo_origen = id;
-            msg_peticion.num_peticion_nodo_origen = peticion;
+            struct msg_solicitud msg_solicitud;
+            msg_solicitud.mtype = 0; // Solicitud de tipo escritor
+            msg_solicitud.id_nodo_origen = id;
+            msg_solicitud.num_peticion_nodo_origen = peticion;
+            msg_solicitud.prioridad_origen = prioridad;
 
             // Lo enviamos a cada nodo
             for (int i = (id + 1) % N; i != id; i = (i + 1) % N)
             {
-                int msgid = msgget(0x900 + i, 0666);
-                msgsnd(msgid, &msg_peticion, sizeof(msg_peticion), 0);
+                int msgid = msgget(NODO + i, 0666);
+                msgsnd(msgid, &msg_solicitud, sizeof(msg_solicitud), 0);
             }
+
             // Esperamos a recibir el testigo
-            struct msgstruct msg_token;
-            int msgid = msgget(0x900 + id, 0666);
-            msgrcv(msgid, &msg_token, sizeof(msg_token), 1, 0);
+            struct msg_token msg_token;
+            int msgid = msgget(NODO + id, 0666);
+            msgrcv(msgid, &msg_token, sizeof(msg_token), 0, 0);
             printf("Token recibido...\n");
 
             // Actualizamos el vector de solicitudes atendidas con el recibido en el mensaje
             for (int i = 0; i < N; i++)
             {
-                vector_atendidas[i] = msg_token.vector_atendidas_token[i];
+                vector_atendidas[prioridad][i] = msg_token.vector_atendidas_token[prioridad][i];
             }
 
             // Actualizamos el estado del testigo en el nodo
@@ -394,22 +456,36 @@ void *administracion()
 
         // Sección crítica
         printf("Sección crítica...\n");
-        getchar();
+        sleep(2);
         printf("Saliendo de la sección crítica...\n");
 
-        // Añadimos la petición creada a la lista de atendidas
-        vector_atendidas[id] = peticion;
+        // Apuntamos que un proceso de prioridad 1 ya no quiere entrar a la sección crítica
+        quiere[prioridad]--;
+        // Apuntamos que la petición ya está atendida si no quedan más peticiones de igual prioridad en el nodo
+        if (quiere[prioridad] == 0)
+        {
+            vector_atendidas[prioridad][id] = peticion;
+        }
 
         // Actualizamos el estado de la sección crítica en el nodo
         seccion_critica = 0;
 
-        // Buscamos si hay algún nodo esperando por el testigo
-        for (int i = (id + 1) % N; i != id; i = (i + 1) % N)
+        int token_enviado = 0;
+        // Buscamos si hay algún nodo esperando por el testigo, ordenando por prioridad
+        for (int j = 0, j < 3; j++)
         {
-            // Si lo hay, le pasamos el testigo
-            if (vector_peticiones[i] > vector_atendidas[i])
+            for (int i = (id + 1) % N; i != id; i = (i + 1) % N)
             {
-                enviar_token(i);
+                // Si lo hay, le pasamos el testigo
+                if (vector_peticiones[j][i] > vector_atendidas[j][i])
+                {
+                    int token_enviado = 1;
+                    enviar_token(i, 0);
+                    break;
+                }
+            }
+            if (token_enviado)
+            {
                 break;
             }
         }
@@ -419,14 +495,15 @@ void *administracion()
 // Proceso de consultas
 void *consultas()
 {
-    int msgid = (int)(intptr_t)arg; // Obtenemos el ID de la cola de mensajes de los clientes
-    struct msg_cliente msg_temp;    // Creamos un struct para almacenar temporalmente el mensaje del cliente
+    int prioridad = 2;
+    int msgid = msgget(CLIENTE + id, 0666 | IPC_CREAT); // Obtenemos el ID de la cola de mensajes de los clientes
+    struct msg_cliente msg_temp;                        // Creamos un struct para almacenar temporalmente el mensaje del cliente
 
     // Bucle principal
     while (1)
     {
-        // Esperamos a recibir un mensaje de pago
-        msgrcv(msgid, &msg_temp, sizeof(msg_temp), 5, 0); // Esperamos mensaje de cliente de tipo 5
+        // Esperamos a recibir un mensaje de cliente de tipo consulta
+        msgrcv(msgid, &msg_temp, sizeof(msg_temp), 5, 0);
 
         printf("Trabajando...\n");
         getchar();
