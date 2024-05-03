@@ -6,6 +6,7 @@
 #include <sys/types.h>
 #include <sys/ipc.h>
 #include <sys/msg.h>
+#include <unistd.h>
 
 #define N 3       // Número de nodos
 #define CLIENTE 0 // Clave para la cola de mensajes de clientes
@@ -30,8 +31,8 @@ struct msg_token
 {
     long mtype;                    // 0 -> token original, 1 -> token copia
     int id_nodo_origen;            // ID del nodo origen
-    int vector_atendidas_token[N]; // Vector de solicitudes atendidas
-}
+    int vector_atendidas_token[3][N]; // Vector de solicitudes atendidas
+};
 
 // Estructura para los mensajes de los clientes
 struct msg_cliente
@@ -79,10 +80,10 @@ void *receptor()
         msgrcv(msgid, &msg_solicitud, sizeof(msg_solicitud), 0, 0);
 
         // Obtenemos los datos del mensaje
-        tipo_origen = msg_peticion.mtype;                                 // Tipo de mensaje, 0 -> solicitud de un escritor, 1 -> solicitud de un lector, 2 -> devolución de token copia
-        id_nodo_origen = msg_peticion.id_nodo_origen;                     // ID del nodo solicitante
-        num_peticion_nodo_origen = msg_peticion.num_peticion_nodo_origen; // Número de petición de solicitud
-        prioridad_origen = msg_peticion.prioridad_origen;                 // Prioridad de la solicitud
+        tipo_origen = msg_solicitud.mtype;                                 // Tipo de mensaje, 0 -> solicitud de un escritor, 1 -> solicitud de un lector, 2 -> devolución de token copia
+        id_nodo_origen = msg_solicitud.id_nodo_origen;                     // ID del nodo solicitante
+        num_peticion_nodo_origen = msg_solicitud.num_peticion_nodo_origen; // Número de petición de solicitud
+        prioridad_origen = msg_solicitud.prioridad_origen;                 // Prioridad de la solicitud
 
         // Actualizamos el vector de peticiones pendientes
         vector_peticiones[prioridad_origen][id_nodo_origen] = num_peticion_nodo_origen > vector_peticiones[prioridad_origen][id_nodo_origen] ? num_peticion_nodo_origen : vector_peticiones[prioridad_origen][id_nodo_origen];
@@ -183,14 +184,14 @@ void *pagos()
 
         int token_enviado = 0;
         // Buscamos si hay algún nodo esperando por el testigo, ordenando por prioridad
-        for (int j = 0, j < 3; j++)
+        for (int j = 0; j < 3; j++)
         {
             for (int i = (id + 1) % N; i != id; i = (i + 1) % N)
             {
                 // Si lo hay, le pasamos el testigo
                 if (vector_peticiones[j][i] > vector_atendidas[j][i])
                 {
-                    int token_enviado = 1;
+                    token_enviado = 1;
                     enviar_token(i, 0);
                     break;
                 }
@@ -280,14 +281,14 @@ void *anulaciones()
 
         int token_enviado = 0;
         // Buscamos si hay algún nodo esperando por el testigo, ordenando por prioridad
-        for (int j = 0, j < 3; j++)
+        for (int j = 0; j < 3; j++)
         {
             for (int i = (id + 1) % N; i != id; i = (i + 1) % N)
             {
                 // Si lo hay, le pasamos el testigo
                 if (vector_peticiones[j][i] > vector_atendidas[j][i])
                 {
-                    int token_enviado = 1;
+                    token_enviado = 1;
                     enviar_token(i, 0);
                     break;
                 }
@@ -377,14 +378,14 @@ void *reservas()
 
         int token_enviado = 0;
         // Buscamos si hay algún nodo esperando por el testigo, ordenando por prioridad
-        for (int j = 0, j < 3; j++)
+        for (int j = 0; j < 3; j++)
         {
             for (int i = (id + 1) % N; i != id; i = (i + 1) % N)
             {
                 // Si lo hay, le pasamos el testigo
                 if (vector_peticiones[j][i] > vector_atendidas[j][i])
                 {
-                    int token_enviado = 1;
+                    token_enviado = 1;
                     enviar_token(i, 0);
                     break;
                 }
@@ -474,14 +475,14 @@ void *administracion()
 
         int token_enviado = 0;
         // Buscamos si hay algún nodo esperando por el testigo, ordenando por prioridad
-        for (int j = 0, j < 3; j++)
+        for (int j = 0; j < 3; j++)
         {
             for (int i = (id + 1) % N; i != id; i = (i + 1) % N)
             {
                 // Si lo hay, le pasamos el testigo
                 if (vector_peticiones[j][i] > vector_atendidas[j][i])
                 {
-                    int token_enviado = 1;
+                    token_enviado = 1;
                     enviar_token(i, 0);
                     break;
                 }
@@ -609,14 +610,14 @@ void *consultas()
         else
         {
             int token_enviado = 0;
-            for (int j = 0, j < 3; j++)
+            for (int j = 0; j < 3; j++)
             {
                 for (int i = (id + 1) % N; i != id; i = (i + 1) % N)
                 {
                     // Si lo hay, le pasamos el testigo
                     if (vector_peticiones[j][i] > vector_atendidas[j][i])
                     {
-                        int token_enviado = 1;
+                        token_enviado = 1;
                         enviar_token(i, 0);
                         break;
                     }
