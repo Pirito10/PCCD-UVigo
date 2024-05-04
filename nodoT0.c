@@ -40,8 +40,8 @@ struct msg_nodo
  * @return devuelve 1 si la prioridad es más prioritaria que las que esperan en el nodo y 0 de lo contrario
 */
 int prioridad_superior(int prioridad) {
-    for(int i = 0; i<prioridad; i++){
-        if(quiere[prioridad] != 0) return 0;
+    for(int i = 0; i<=prioridad; i++){
+        if(quiere[i] != 0) return 0;
     }
     return 1;
 }
@@ -77,6 +77,10 @@ void t0(int id_t0)
         struct msg_nodo msg_cliente;
         // Recibir peticion cliente
         msgrcv(cola_msg, &msg_cliente, sizeof(msg_cliente), CLIENT, 0);
+        quiere[0]++;
+        if(!token) {
+
+        }
     }
 }
 
