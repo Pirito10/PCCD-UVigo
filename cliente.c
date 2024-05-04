@@ -15,7 +15,7 @@ int main(int argc, char *argv[])
 {
     if (argc < 2)
     {
-        printf("Debes introducir el número de nodos del sistema: ./cliente <N>\n");
+        printf("Uso: %s <N>\n", argv[0]);
         return EXIT_FAILURE;
     }
 
@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
     int tipo_solicitud, ID;
     int N = atoi(argv[1]);
 
-    if (N < 0)
+    if (N <= 0)
     {
         printf("El número de nodos debe ser mayor que cero\n");
         return EXIT_FAILURE;
@@ -59,7 +59,11 @@ int main(int argc, char *argv[])
         msg_nodo.mtype = tipo_solicitud + 10; // Ver la defición del struct
 
         // Enviamos el mensaje
-        msgsnd(msgid, &msg_nodo, sizeof(msg_nodo), 0);
+        if (msgsnd(msgid, &msg_nodo, sizeof(msg_nodo), 0) == -1)
+        {
+            perror("Error al enviar mensaje");
+            continue;
+        }
 
         printf("Solicitud enviada\n\n");
     }
