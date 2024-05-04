@@ -33,7 +33,8 @@ int main(int argc, char *argv[])
     while (1)
     {
         // Tomamos el ID
-        printf("Introduce el ID del nodo al que quieres enviar la solicitud (0-%d), o -1 para salir: ", N);
+        int nodo_max = N - 1;
+        printf("Introduce el ID del nodo al que quieres enviar la solicitud (0-%d), o -1 para salir: ", nodo_max);
         scanf("%d", &ID);
 
         if (ID == -1)
@@ -41,7 +42,7 @@ int main(int argc, char *argv[])
             return EXIT_SUCCESS;
         }
 
-        if (ID > N || ID < -1)
+        if (ID > nodo_max || ID < -1)
         {
             printf("Has seleccionado un nodo que no existe\n\n");
             continue;
@@ -52,7 +53,7 @@ int main(int argc, char *argv[])
         scanf("%d", &tipo_solicitud);
 
         // Obtenemos la cola de mensajes del nodo
-        int msgid = msgget(ID, 0666 | IPC_CREAT);
+        int msgid = msgget(ID + 1000, 0666 | IPC_CREAT);
 
         // Creamos el mensaje
         struct msg_nodo msg_nodo;

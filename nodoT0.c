@@ -13,7 +13,8 @@
 
 #define TOKEN 1
 #define REQUEST 2
-#define CLIENT 3
+#define PAGOS 11
+#define ANULACIONES 12
 
 #define N 3 // Número de nodos
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
@@ -153,7 +154,7 @@ void *t0(void *args)
     {
         struct msg_nodo msg_cliente;
         // Recibir peticion cliente
-        msgrcv(cola_msg, &msg_cliente, sizeof(msg_cliente), CLIENT, 0);
+        msgrcv(cola_msg, &msg_cliente, sizeof(msg_cliente), PAGOS, 0);
         
         quiere[0]++;
         
@@ -219,12 +220,16 @@ void main(int argc, char *argv[])
 {
     id = atoi(argv[1]); // ID del nodo
 
+    if(id == 0) {
+        token = 1;
+    }
+
     // Incializar cola nodo
-    cola_msg = msgget(id, 0666 | IPC_CREAT);
+    cola_msg = msgget(1000 + id, 0666 | IPC_CREAT);
     if (cola_msg != -1)
     {
         msgctl(cola_msg, IPC_RMID, NULL);
-        cola_msg = msgget(id, 0666 | IPC_CREAT);
+        cola_msg = msgget(1000 + id, 0666 | IPC_CREAT);
     }
 
     // Inicialización sem
@@ -233,7 +238,7 @@ void main(int argc, char *argv[])
 
     // Se crean 10 hilos t0
     pthread_t hilo_t0[10];
-    for (int i = 0; i < 10; i++)
+    for (int i = 0; i < 1; i++)
     {
         pthread_create(&hilo_t0[i], NULL, t0, NULL);
     }
