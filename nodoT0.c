@@ -11,6 +11,10 @@
 #include <sys/msg.h>
 #include <unistd.h>
 
+#define TOKEN 1
+#define REQUEST 2
+#define CLIENT 3
+
 #define N 3 // Número de nodos
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
@@ -23,7 +27,7 @@ int quiere[3]; // Vector de procesos que quieren por cada prioridad
 // Estructura de los mensajes
 struct msg_nodo
 {
-    long mtype;                   // Tipo de mensaje, 0 -> token, 1 -> peticion
+    long mtype;                   // Tipo de mensaje, 1 -> token, 2 -> peticion nodo, 3 -> peticion cliente
     int id_nodo_origen;           // ID del nodo origen
     int num_peticion_nodo_origen; // Número de petición del nodo origen
     int prioridad_origen;         // Prioridad de la solicitud
@@ -68,6 +72,9 @@ void t0(int id_t0)
 {
     while (1)
     {
+        struct msg_nodo msg_cliente;
+        // Recibir peticion cliente
+        msgrcv(cola_msg, &msg_cliente, sizeof(msg_cliente), CLIENT, 0);
     }
 }
 
