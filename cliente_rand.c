@@ -50,6 +50,12 @@ int main(int argc, char *argv[])
         solicitudes_activas[i] = atoi(argv[4 + i]);
     }
 
+    if (solicitudes_activas[0] == 0 && solicitudes_activas[1] == 0 && solicitudes_activas[2] == 0 && solicitudes_activas[3] == 0 && solicitudes_activas[4] == 0)
+    {
+        printf("Tienes que seleccionar al menos un tipo de solicitud\n");
+        return EXIT_FAILURE;
+    }
+
     srand(time(NULL)); // Generador de números aleatorios
 
     for (int i = 0; i < num_solicitudes; ++i)
