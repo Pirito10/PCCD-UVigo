@@ -38,10 +38,12 @@ struct msg_nodo
  * Comprueba el vector quiere del nodo para determinar si hay procesos más prioritarios que el parámetro a la espera
  * @param prioridad prioridad a comprobar
  * @return devuelve 1 si la prioridad es más prioritaria que las que esperan en el nodo y 0 de lo contrario
- */
-int prioridad_superior(int prioridad)
-{
-    return NULL;
+*/
+int prioridad_superior(int prioridad) {
+    for(int i = 0; i<prioridad; i++){
+        if(quiere[prioridad] != 0) return 0;
+    }
+    return 1;
 }
 
 /**
