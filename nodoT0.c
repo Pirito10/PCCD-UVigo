@@ -36,14 +36,18 @@ struct msg_nodo
  * @return devuelve 1 si la prioridad es más prioritaria que las que esperan en el nodo y 0 de lo contrario
 */
 int prioridad_superior(int prioridad) {
-    return NULL;
+    for(int i = 0; i<prioridad; i++){
+        if(quiere[prioridad] != 0) return 0;
+    }
+    return 1;
 }
 
 /**
  * Envía el token a otro nodo especificado
  * @param id_nodo id del nodo al que se envía el token
 */
-void eviar_token(int id_nodo) {
+void enviar_token(int id_nodo) {
+
 
 }
 
