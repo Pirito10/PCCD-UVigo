@@ -89,6 +89,18 @@ void broadcast(int prioridad)
         msgsnd(msgid, &msg_nodo, sizeof(msg_nodo), 0);
     }
 }
+/**
+ * Comprueba si hay una petición activa por prioridad en este nodo
+ * @param prioridad prioridad de la petición
+ * @return 1 si hay una petición activa, 0 en caso contrario
+*/
+void peticion_activa(int prioridad){
+    if(vector_atendidas[prioridad][id] != vector_peticiones[prioridad][id]) return 0;
+    else{
+        return 1;
+    }
+
+}
 
 void t0(int id_t0)
 {
