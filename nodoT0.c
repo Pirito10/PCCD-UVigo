@@ -146,7 +146,7 @@ int buscar_nodo_siguiente() {
     return -1;
 }
 
-void t0(int id_t0)
+void *t0(void *args)
 {
     while (1)
     {
@@ -234,7 +234,7 @@ void main(int argc, char *argv[])
     pthread_t hilo_t0[10];
     for (int i = 0; i < 10; i++)
     {
-        pthread_create(&hilo_t0[i], NULL, t0, i);
+        pthread_create(&hilo_t0[i], NULL, t0, NULL);
     }
 
     receptor();
