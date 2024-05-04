@@ -38,10 +38,13 @@ struct msg_nodo
  * Comprueba el vector quiere del nodo para determinar si hay procesos más prioritarios que el parámetro a la espera
  * @param prioridad prioridad a comprobar
  * @return devuelve 1 si la prioridad es más prioritaria que las que esperan en el nodo y 0 de lo contrario
-*/
-int prioridad_superior(int prioridad) {
-    for(int i = 0; i<=prioridad; i++){
-        if(quiere[i] != 0) return 0;
+ */
+int prioridad_superior(int prioridad)
+{
+    for (int i = 0; i < prioridad; i++)
+    {
+        if (quiere[prioridad] != 0)
+            return 0;
     }
     return 1;
 }
@@ -70,6 +73,23 @@ void enviar_token(int id_nodo)
     msgsnd(msgid, &msg_nodo, sizeof(msg_nodo), 0);
 }
 
+void broadcast(int prioridad)
+{
+    // Creamos el mensaje de solicitud
+    struct msg_nodo msg_nodo;
+    msg_nodo.mtype = 2;
+    msg_nodo.id_nodo_origen = id;
+    msg_nodo.num_peticion_nodo_origen = vector_peticiones[id];
+    msg_nodo.prioridad_origen = prioridad;
+
+    // Lo enviamos a cada nodo
+    for (int i = (id + 1) % N; i != id; i = (i + 1) % N)
+    {
+        int msgid = msgget(i, 0666);
+        msgsnd(msgid, &msg_nodo, sizeof(msg_nodo), 0);
+    }
+}
+
 void t0(int id_t0)
 {
     while (1)
@@ -77,10 +97,6 @@ void t0(int id_t0)
         struct msg_nodo msg_cliente;
         // Recibir peticion cliente
         msgrcv(cola_msg, &msg_cliente, sizeof(msg_cliente), CLIENT, 0);
-        quiere[0]++;
-        if(!token) {
-
-        }
     }
 }
 
