@@ -18,11 +18,16 @@
 #define N 3 // Número de nodos
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
-int token, id, seccion_critica, cola_msg; // Testigos, ID del nodo, estado de la SC y la cola del nodo
+int token, id, seccion_critica, cola_msg = 0; // Testigos, ID del nodo, estado de la SC y la cola del nodo
 int vector_peticiones[3][N];              // Cola de solicitudes por atender
 int vector_atendidas[3][N];               // Cola de solicitudes atendidas
 
 int quiere[3]; // Vector de procesos que quieren por cada prioridad
+
+int espera_token = 0;           // Número de procesos a la espera de token
+sem_t token_solicitado_sem;     // Sem paso procesos espera token
+
+sem_t mutex_sc_sem;                 // Sem exclusion mutua de SC
 
 // Estructura de los mensajes
 struct msg_nodo
@@ -73,6 +78,10 @@ void enviar_token(int id_nodo)
     msgsnd(msgid, &msg_nodo, sizeof(msg_nodo), 0);
 }
 
+/**
+ * Broadcastea una request de la prioridad aportada a todos los otros nodos del SC
+ * @param prioridad prioridad de la request a broadcastear
+*/
 void broadcast(int prioridad)
 {
     // Creamos el mensaje de solicitud
@@ -94,12 +103,47 @@ void broadcast(int prioridad)
  * @param prioridad prioridad de la petición
  * @return 1 si hay una petición activa, 0 en caso contrario
 */
-void peticion_activa(int prioridad){
+int peticion_activa(int prioridad){
     if(vector_atendidas[prioridad][id] != vector_peticiones[prioridad][id]) return 0;
     else{
         return 1;
     }
 
+}
+
+/**
+ * Sustituye los valores del vector de atendidas por los del vector aportado como parametro
+ * @param vector_atendidas_nuevo nuevo vector de atendidas para el nodo
+*/
+void actualizar_atendidas(int vector_atendidas_nuevo[3][N]) {
+    for(int i = 0; i < 3; i++) {
+        for(int j = 0; j < N; j++) {
+            vector_atendidas[i][j] = vector_atendidas_nuevo[i][j];
+        }
+    }
+}
+
+/**
+ * Determina el id del nodo siguiente teniendo en cuenta el vector de peticiones, atendidas y quiere.
+ * En caso de existir una petición más prioritaria de otro nodo que las que esperan en este nodo devuelve el id del nodo que ha hecho la petición prioritaria
+ * 
+ * @return id del nodo con la petición prioritaria o -1 en caso de no existir
+*/
+int buscar_nodo_siguiente() {
+    int prioridad_este_nodo = 3;
+    for(int i  = 0; i < 3; i++) {
+        if(quiere[i] > 0) {
+            prioridad_este_nodo = i;
+        }
+    }
+    for(int i = 0; i < prioridad_este_nodo; i++) {
+        for(int j = (id + 1) % N; j != id; j = (j + 1) % N) {
+            if(vector_peticiones[i][j] > vector_atendidas[i][j]) {
+                return j;
+            }
+        }
+    }
+    return -1;
 }
 
 void t0(int id_t0)
@@ -110,6 +154,45 @@ void t0(int id_t0)
         // Recibir peticion cliente
         msgrcv(cola_msg, &msg_cliente, sizeof(msg_cliente), CLIENT, 0);
         
+        quiere[0]++;
+        
+        if(!token) {
+            if(!peticion_activa(0)) {
+                broadcast(0);
+            }
+            if(espera_token) {
+                espera_token++;
+                sem_wait(&token_solicitado_sem);
+            } else {
+                espera_token++;
+                struct msg_nodo msg_token;
+                // Recibir token
+                msgrcv(cola_msg, &msg_token, sizeof(msg_token), TOKEN, 0);
+                actualizar_atendidas(msg_token.vector_atendidas);
+                token = 1;
+                // Despertar a los procesos que esperaban el token
+                for (int i = 1; i < espera_token; i++) {
+                    sem_post(&token_solicitado_sem);
+                }
+                espera_token = 0;
+            }
+        }
+
+        sem_wait(&mutex_sc_sem);
+        seccion_critica = 1;
+        // SECCIÓN CRÍTICA
+        seccion_critica = 0;
+        sem_post(&mutex_sc_sem);
+
+        quiere[0]--;
+        if(quiere[0] == 0) {
+            vector_atendidas[0][id] = vector_peticiones[0][id];
+            int nodo_siguiente = buscar_nodo_siguiente();
+            if(nodo_siguiente > 0) {
+                token = 0;
+                enviar_token(nodo_siguiente);
+            }
+        }
     }
 }
 
@@ -136,13 +219,18 @@ void main(int argc, char *argv[])
     id = atoi(argv[1]); // ID del nodo
 
     // Incializar cola nodo
-    int msgid;
-    msgid = msgget(id, 0666 | IPC_CREAT);
-    if (msgid != -1)
+    cola_msg = msgget(id, 0666 | IPC_CREAT);
+    if (cola_msg != -1)
     {
-        msgctl(msgid, IPC_RMID, NULL);
+        msgctl(cola_msg, IPC_RMID, NULL);
+        cola_msg = msgget(id, 0666 | IPC_CREAT);
     }
 
+    // Inicialización sem
+    sem_init(&token_solicitado_sem, 0, 0);
+    sem_init(&mutex_sc_sem, 0, 1);
+
+    // Se crean 10 hilos t0
     pthread_t hilo_t0[10];
     for (int i = 0; i < 10; i++)
     {
