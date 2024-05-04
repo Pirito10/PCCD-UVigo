@@ -88,7 +88,7 @@ void broadcast(int prioridad)
     struct msg_nodo msg_nodo;
     msg_nodo.mtype = REQUEST;
     msg_nodo.id_nodo_origen = id;
-    msg_nodo.num_peticion_nodo_origen = vector_peticiones[id];
+    msg_nodo.num_peticion_nodo_origen = vector_peticiones[prioridad][id];
     msg_nodo.prioridad_origen = prioridad;
 
     // Lo enviamos a cada nodo
