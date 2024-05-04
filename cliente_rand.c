@@ -15,9 +15,9 @@ struct msg_nodo
 
 int main(int argc, char *argv[])
 {
-    if (argc < 4)
+    if (argc != 9)
     {
-        printf("Uso: %s <N> <cantidad de solicitudes> <tiempo máximo entre solicitud(ms)>\n", argv[0]);
+        printf("Uso: %s <N> <cantidad de solicitudes> <tiempo máximo entre solicitud(ms)> <solicitud_pago> <solicitud_anulacion> <solicitud_reserva> <solicitud_administracion> <solicitud_consulta>\n", argv[0]);
         return EXIT_FAILURE;
     }
 
@@ -43,14 +43,26 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
+    // Apuntamos qué tipo de solicitudes se van a enviar
+    int solicitudes_activas[5];
+    for (int i = 0; i < 5; i++)
+    {
+        solicitudes_activas[i] = atoi(argv[4 + i]);
+    }
+
     srand(time(NULL)); // Generador de números aleatorios
 
     for (int i = 0; i < num_solicitudes; ++i)
     {
         // Seleccionamos el nodo a enviar de forma aleatoria, entre 0 y N
         int ID = rand() % N;
-        // Seleccionamos el tipo de solicitud de forma aleatoria, entre 1 y 5
-        int tipo_solicitud = (rand() % 5) + 1;
+
+        // Seleccionamos el tipo de solicitud de forma aleatoria, entre 1 y 5, exluyendo las que el usuario no ha seleccionado
+        int tipo_solicitud;
+        do
+        {
+            tipo_solicitud = (rand() % 5) + 1;
+        } while (!solicitudes_activas[tipo_solicitud - 1]);
 
         // Obtenemos la cola de mensajes del nodo
         int msgid = msgget(ID, 0666 | IPC_CREAT);
