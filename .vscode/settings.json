@@ -12,6 +12,7 @@
         "stddef.h": "c",
         "semaphore.h": "c",
         "unistd.h": "c",
-        "types.h": "c"
+        "types.h": "c",
+        "lista-testigo-copia.h": "c"
     }
 }

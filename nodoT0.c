@@ -97,6 +97,7 @@ void t0(int id_t0)
         struct msg_nodo msg_cliente;
         // Recibir peticion cliente
         msgrcv(cola_msg, &msg_cliente, sizeof(msg_cliente), CLIENT, 0);
+        
     }
 }
 
