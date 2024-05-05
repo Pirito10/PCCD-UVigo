@@ -20,27 +20,28 @@
 
 #define MAX(a, b) (((a) > (b)) ? (a) : (b)) // Cálculo de valor máximo entre dos variables
 
-int token, id, seccion_critica, cola_msg = 0; // Testigos, ID del nodo, estado de la SC y la cola del nodo
-int primero_t1 = 1;                           // Está a 0 cuando los procesos T1 ya se han empezado a dar paso unos a otros
-int vector_peticiones[3][N];                  // Cola de solicitudes por atender
-int vector_atendidas[3][N];                   // Cola de solicitudes atendidas
+int token, id, seccion_critica; // Testigo, ID del nodo y estado de la SC
+int vector_peticiones[3][N];    // Cola de solicitudes por atender
+int vector_atendidas[3][N];     // Cola de solicitudes atendidas
+int cola_msg = 0;               // Cola de mensajes del nodo
+int primero_t1 = 1;             // Está a 0 cuando los procesos T1 ya se han empezado a dar paso unos a otros
 
-int quiere[3] = {0, 0, 0}; // Vector de procesos que quieren por cada prioridad
+int quiere[3] = {0, 0, 0}; // Vector de procesos que quieren SC por cada prioridad
 
 int espera_token = 0;       // Número de procesos a la espera de token
-sem_t token_solicitado_sem; // Sem paso procesos espera token
+sem_t token_solicitado_sem; // Semáforo de paso para procesos en espera de token
 
 int espera_t1;       // Número de procesos de T1 que están a la espera
-sem_t espera_t1_sem; // Sem paso procesos t1 espera prioridad superior o en cola SC
+sem_t espera_t1_sem; // Semáforo de paso para procesos T1 en espera por prioridad superior o en cola de SC
 
-sem_t mutex_sc_sem; // Sem exclusion mutua de SC
+sem_t mutex_sc_sem; // Semáforo de exclusión mutua de SC
 
 void *t0(void *args)
 {
     while (1)
     {
         struct msg_nodo msg_cliente = (const struct msg_nodo){0};
-        // Recibir peticion cliente
+        // Esperamos a recibir una solicitud de pago de un cliente
         msgrcv(cola_msg, &msg_cliente, sizeof(msg_cliente), PAGOS, 0);
 
         quiere[0]++;
@@ -188,16 +189,17 @@ void *t1(void *args)
     }
 }
 
+// Función receptora de mensajes de otros nodos
 void receptor()
 {
     while (1)
     {
         struct msg_nodo msg_peticion = (const struct msg_nodo){0};
-        // Recibir peticion
+        // Esperamos a recibir una solicitud de token
         msgrcv(cola_msg, &msg_peticion, sizeof(msg_peticion), REQUEST, 0);
-        // Actualizar vector peticiones
+        // Actualizamos el vector de peticiones
         vector_peticiones[msg_peticion.prioridad_origen][msg_peticion.id_nodo_origen] = MAX(vector_peticiones[msg_peticion.prioridad_origen][msg_peticion.id_nodo_origen], msg_peticion.num_peticion_nodo_origen);
-        // Pasar token si procede
+        // Pasamos el token si procede
         if (token && !seccion_critica && prioridad_superior(msg_peticion.prioridad_origen) && (vector_peticiones[msg_peticion.prioridad_origen][msg_peticion.id_nodo_origen] > vector_atendidas[msg_peticion.prioridad_origen][msg_peticion.id_nodo_origen]))
         {
             token = 0;
@@ -208,7 +210,7 @@ void receptor()
 
 int main(int argc, char *argv[])
 {
-    // Inicializar arrays
+    // Inicializamos los arrays a cero
     for (int i = 0; i < 3; i++)
     {
         for (int j = 0; j < N; j++)
@@ -220,35 +222,38 @@ int main(int argc, char *argv[])
 
     id = atoi(argv[1]); // ID del nodo
 
+    // Damos el token al nodo con ID = 0
     if (id == 0)
     {
         token = 1;
     }
 
-    // Incializar cola nodo
+    // Incializamos la cola de mensajes del nodo
     cola_msg = msgget(1000 + id, 0666 | IPC_CREAT);
     if (cola_msg != -1)
     {
         msgctl(cola_msg, IPC_RMID, NULL);
-        cola_msg = msgget(1000 + id, 0666 | IPC_CREAT);
     }
 
-    // Inicialización sem
+    // Inicializamos los semáforos
     sem_init(&token_solicitado_sem, 0, 0);
     sem_init(&espera_t1_sem, 0, 0);
     sem_init(&mutex_sc_sem, 0, 1);
 
+    // Creamos los hilos de prioridad T0
     pthread_t hilo_t0[3];
     for (int i = 0; i < 3; i++)
     {
         pthread_create(&hilo_t0[i], NULL, t0, NULL);
     }
 
+    // Creamos los hilos de prioridad T1
     pthread_t hilo_t1[3];
     for (int i = 0; i < 3; i++)
     {
         pthread_create(&hilo_t1[i], NULL, t1, NULL);
     }
 
+    // Ejecutamos el receptor de mensajes (bucle infinito)
     receptor();
 }
