@@ -53,7 +53,7 @@ int main(int argc, char *argv[])
         scanf("%d", &tipo_solicitud);
 
         // Obtenemos la cola de mensajes del nodo
-        int msgid = msgget(ID + 1000, 0666 | IPC_CREAT);
+        int msgid = msgget(1000 + ID, 0666 | IPC_CREAT);
 
         // Creamos el mensaje
         struct msg_nodo msg_nodo;
