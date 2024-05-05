@@ -259,7 +259,7 @@ void *t1(void *args) {
 
         quiere[1]--;
         if(quiere[1] == 0) {
-            primero_t1 == 1;
+            primero_t1 = 1;
             vector_atendidas[1][id] = vector_peticiones[1][id];
         }
         int nodo_siguiente = buscar_nodo_siguiente();
@@ -297,7 +297,7 @@ void receptor()
     }
 }
 
-void main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
     // Inicializar arrays
     for(int i = 0; i < 3; i++) {
