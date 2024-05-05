@@ -3,9 +3,6 @@
 
 #include "utils.h" // Archivo de cabecera con la definición de las funciones y estructura de los mensajes
 
-#define TOKEN 1   // Mensajes de envío de testigo
-#define REQUEST 2 // Mensajes de solicitud de testigo
-
 // Variables globales en nodo.c
 extern int id, quiere[3];                                   // ID del nodo y vector de procesos que quieren SC por cada prioridad
 extern int vector_peticiones[3][N], vector_atendidas[3][N]; // Cola de solicitudes por atender y cola de solicitudes atendidas

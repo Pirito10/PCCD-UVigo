@@ -8,16 +8,6 @@
 
 #include "utils.h" // Archivo de cabecera con la definición de las funciones y estructura de los mensajes
 
-#define N 3 // Número de nodos
-
-#define TOKEN 1           // Mensajes de envío de testigo
-#define REQUEST 2         // Mensajes de solicitud de testigo
-#define PAGOS 11          // Mensajes de solicitud de pagos
-#define ANULACIONES 12    // Mensajes de solicitud de anulaciones
-#define RESERVAS 13       // Mensajes de solicitud de reservas
-#define ADMINISTRACION 14 // Mensajes de solicitud de administración
-#define CONSULTAS 15      // Mensajes de solicitud de consultas
-
 #define MAX(a, b) (((a) > (b)) ? (a) : (b)) // Cálculo de valor máximo entre dos variables
 
 int token, id, seccion_critica; // Testigo, ID del nodo y estado de la SC

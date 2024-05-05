@@ -2,6 +2,14 @@
 
 #define N 3 // Número de nodos
 
+#define TOKEN 1           // Mensajes de envío de testigo
+#define REQUEST 2         // Mensajes de solicitud de testigo
+#define PAGOS 11          // Mensajes de solicitud de pagos
+#define ANULACIONES 12    // Mensajes de solicitud de anulaciones
+#define RESERVAS 13       // Mensajes de solicitud de reservas
+#define ADMINISTRACION 14 // Mensajes de solicitud de administración
+#define CONSULTAS 15      // Mensajes de solicitud de consultas
+
 // Estructura de los mensajes
 struct msg_nodo
 {
