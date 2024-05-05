@@ -10,9 +10,9 @@ EXEC_CLIENTE = cliente
 EXEC_CLIENTE_RAND = cliente_rand
 
 # Archivos fuente
-SRC_NODO = nodo.c
-SRC_CLIENTE = cliente.c
-SRC_CLIENTE_RAND = cliente_rand.c
+SRC_NODO = nodo.c utils.c
+SRC_CLIENTE = cliente.c $(SRC_UTILS)
+SRC_CLIENTE_RAND = cliente_rand.c $(SRC_UTILS)
 
 # Regla por defecto (lo que se ejecuta si solo se llama 'make')
 all: $(EXEC_NODO) $(EXEC_CLIENTE) $(EXEC_CLIENTE_RAND)
