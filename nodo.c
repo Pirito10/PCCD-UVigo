@@ -233,6 +233,7 @@ int main(int argc, char *argv[])
     if (cola_msg != -1)
     {
         msgctl(cola_msg, IPC_RMID, NULL);
+        cola_msg = msgget(1000 + id, 0666 | IPC_CREAT);
     }
 
     // Inicializamos los semáforos
