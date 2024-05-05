@@ -62,7 +62,7 @@ int prioridad_superior(int prioridad)
 void enviar_token(int id_nodo)
 {
     // Creamos el mensaje
-    struct msg_nodo msg_nodo;
+    struct msg_nodo msg_nodo = (const struct msg_nodo){0};
     msg_nodo.mtype = TOKEN;
     msg_nodo.id_nodo_origen = id;
     for (int j = 0; j < 3; j++)
@@ -75,7 +75,7 @@ void enviar_token(int id_nodo)
     }
 
     // Enviamos el mensaje con el testigo
-    int msgid = msgget(id_nodo, 0666);
+    int msgid = msgget(id_nodo + 1000, 0666);
     msgsnd(msgid, &msg_nodo, sizeof(msg_nodo), 0);
 }
 
@@ -86,7 +86,7 @@ void enviar_token(int id_nodo)
 void broadcast(int prioridad)
 {
     // Creamos el mensaje de solicitud
-    struct msg_nodo msg_nodo;
+    struct msg_nodo msg_nodo = (const struct msg_nodo){0};
     msg_nodo.mtype = REQUEST;
     msg_nodo.id_nodo_origen = id;
     vector_peticiones[prioridad][id]++;
@@ -96,21 +96,18 @@ void broadcast(int prioridad)
     // Lo enviamos a cada nodo
     for (int i = (id + 1) % N; i != id; i = (i + 1) % N)
     {
-        int msgid = msgget(i, 0666);
+        int msgid = msgget(i + 1000, 0666);
         msgsnd(msgid, &msg_nodo, sizeof(msg_nodo), 0);
     }
 }
+
 /**
  * Comprueba si hay una petición activa por prioridad en este nodo
  * @param prioridad prioridad de la petición
  * @return 1 si hay una petición activa, 0 en caso contrario
 */
 int peticion_activa(int prioridad){
-    if(vector_atendidas[prioridad][id] != vector_peticiones[prioridad][id]) return 0;
-    else{
-        return 1;
-    }
-
+    return vector_peticiones[prioridad][id] > vector_atendidas[prioridad][id];
 }
 
 /**
@@ -152,7 +149,7 @@ void *t0(void *args)
 {
     while (1)
     {
-        struct msg_nodo msg_cliente;
+        struct msg_nodo msg_cliente = (const struct msg_nodo){0};
         // Recibir peticion cliente
         msgrcv(cola_msg, &msg_cliente, sizeof(msg_cliente), PAGOS, 0);
         
@@ -167,7 +164,7 @@ void *t0(void *args)
                 sem_wait(&token_solicitado_sem);
             } else {
                 espera_token++;
-                struct msg_nodo msg_token;
+                struct msg_nodo msg_token = (const struct msg_nodo){0};
                 // Recibir token
                 msgrcv(cola_msg, &msg_token, sizeof(msg_token), TOKEN, 0);
                 actualizar_atendidas(msg_token.vector_atendidas);
@@ -202,7 +199,7 @@ void receptor()
 {
     while (1)
     {
-        struct msg_nodo msg_peticion;
+        struct msg_nodo msg_peticion = (const struct msg_nodo){0};
         // Recibir peticion
         msgrcv(cola_msg, &msg_peticion, sizeof(msg_peticion), REQUEST, 0);
         // Actualizar vector peticiones
@@ -246,7 +243,7 @@ void main(int argc, char *argv[])
 
     // Se crean 10 hilos t0
     pthread_t hilo_t0[10];
-    for (int i = 0; i < 1; i++)
+    for (int i = 0; i < 10; i++)
     {
         pthread_create(&hilo_t0[i], NULL, t0, NULL);
     }
