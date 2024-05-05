@@ -64,7 +64,7 @@ void actualizar_atendidas(int vector_atendidas_nuevo[3][N])
     {
         for (int j = 0; j < N; j++)
         {
-            vector_atendidas[i][j] = vector_atendidas_nuevo[i][j];
+            vector_atendidas[i][j] = MAX(vector_atendidas_nuevo[i][j], vector_atendidas[i][j]);
         }
     }
 }
