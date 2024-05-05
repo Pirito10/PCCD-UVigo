@@ -1,5 +1,4 @@
 #ifndef UTILS_H
-#define UTILS_H
 
 #define N 3 // Número de nodos
 
