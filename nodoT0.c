@@ -23,7 +23,7 @@ int token, id, seccion_critica, cola_msg = 0; // Testigos, ID del nodo, estado d
 int vector_peticiones[3][N];              // Cola de solicitudes por atender
 int vector_atendidas[3][N];               // Cola de solicitudes atendidas
 
-int quiere[3]; // Vector de procesos que quieren por cada prioridad
+int quiere[3] = {0, 0, 0};      // Vector de procesos que quieren por cada prioridad
 
 int espera_token = 0;           // Número de procesos a la espera de token
 sem_t token_solicitado_sem;     // Sem paso procesos espera token
@@ -218,6 +218,14 @@ void receptor()
 
 void main(int argc, char *argv[])
 {
+    // Inicializar arrays
+    for(int i = 0; i < 3; i++) {
+        for(int j = 0; j < N; j++) {
+            vector_atendidas[i][j] = 0;
+            vector_peticiones[i][j] = 0;
+        }
+    }
+
     id = atoi(argv[1]); // ID del nodo
 
     if(id == 0) {
