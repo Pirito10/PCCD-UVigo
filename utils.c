@@ -1,3 +1,4 @@
+#include <stdlib.h>
 #include <sys/msg.h>
 
 #include "utils.h" // Archivo de cabecera con la definición de las funciones y estructura de los mensajes
@@ -8,6 +9,7 @@
 // Variables globales en nodo.c
 extern int id, quiere[3];                                   // ID del nodo y vector de procesos que quieren SC por cada prioridad
 extern int vector_peticiones[3][N], vector_atendidas[3][N]; // Cola de solicitudes por atender y cola de solicitudes atendidas
+struct NodoLista *nodo_cabeza = NULL;                       // Puntero que apunta al primer nodo de la lista
 
 /**
  * Envía el token a otro nodo especificado
@@ -122,4 +124,91 @@ int prioridad_superior(int prioridad)
             return 0;
     }
     return 1;
+}
+
+/**
+ * Añade un ID a la lista enlazada de IDs
+ * @param id ID del nodo a añadir a la lista
+ */
+void añadir_lista(int id)
+{
+    // Si la lista está vacía
+    if (lista_vacia() == 1)
+    {
+        // Creamos un nodo como primer elemento
+        struct NodoLista *nodoNuevo = (struct NodoLista *)malloc(sizeof(struct NodoLista));
+        nodoNuevo->sig = NULL;
+        nodoNuevo->id = id;
+        nodo_cabeza = nodoNuevo;
+    }
+    // Si ya existe algún elemento
+    else
+    {
+        // Insertamos un nodo en la lista
+        struct NodoLista *nodoNuevo = (struct NodoLista *)malloc(sizeof(struct NodoLista));
+        nodoNuevo->sig = nodo_cabeza;
+        nodoNuevo->id = id;
+        nodo_cabeza = nodoNuevo;
+    }
+}
+
+/**
+ * Elimina un ID de la lista enlazada de IDs
+ * @param id ID del nodo a eliminar a la lista
+ */
+void quitar_lista(int id)
+{
+    // Si la lista está vacía, no hacemos nada
+    if (lista_vacia() == 1)
+    {
+        return;
+    }
+
+    // Obtenemos el primer elemento de la lista, y creamos un nodo auxiliar
+    struct NodoLista *nodo_actual = nodo_cabeza;
+    struct NodoLista *nodo_anterior = NULL;
+
+    // Recorremos la lista buscando el ID deseado
+    while (nodo_actual != NULL && nodo_actual->id != id)
+    {
+        nodo_anterior = nodo_actual;
+        nodo_actual = nodo_actual->sig;
+    }
+
+    // Si no se encuentra, no hacemos nada
+    if (nodo_actual == NULL)
+    {
+        return;
+    }
+
+    // Cuando lo encontramos, diferenciamos si era el primer elemento, o uno de por medio
+    if (nodo_anterior == NULL)
+    {
+        nodo_cabeza = nodo_actual->sig;
+    }
+    else
+    {
+        nodo_anterior->sig = nodo_actual->sig;
+    }
+
+    // Liberamos la memoria ocupada por el nodo
+    free(nodo_actual);
+
+    return;
+}
+
+/**
+ * Comprueba si la lista enlazada de IDs está vacía
+ * @return 1 si la lista está vacía, 0 cero si existe al menos un elemento
+ */
+int lista_vacia()
+{
+    if (nodo_cabeza == NULL)
+    {
+        return 1;
+    }
+    else
+    {
+        return 0;
+    }
 }

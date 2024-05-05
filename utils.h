@@ -12,6 +12,13 @@ struct msg_nodo
     int vector_atendidas[3][N];   // Vector atendidas
 };
 
+// Estructura de los elementos de la lista enlazada de IDs
+struct NodoLista
+{
+    int id;
+    struct NodoLista *sig;
+};
+
 // Declaraciones de las funciones
 void enviar_token(int id_nodo);
 void broadcast(int prioridad);
@@ -19,5 +26,8 @@ void actualizar_atendidas(int vector_atendidas_nuevo[3][N]);
 int buscar_nodo_siguiente();
 int peticion_activa(int prioridad);
 int prioridad_superior(int prioridad);
+void anadir_lista(int id);
+void quitar_lista(int id);
+int lista_vacia();
 
 #endif
