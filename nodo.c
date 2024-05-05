@@ -11,661 +11,242 @@
 #include <sys/msg.h>
 #include <unistd.h>
 
-#define N 3       // Número de nodos
-#define CLIENTE 0 // Clave para la cola de mensajes de clientes
-#define NODO 1000 // Clave para la cola de mensajes internodo
+#define TOKEN 1
+#define REQUEST 2
+#define PAGOS 11
+#define ANULACIONES 12
 
-int vector_peticiones[3][N];                                                     // Cola de solicitudes por atender
-int vector_atendidas[3][N];                                                      // Cola de solicitudes atendidas
-int token, token_lector, id, seccion_critica = 0, sc_lectores = 0, peticion = 0; // Testigos, ID del nodo, estado de la SC y número de petición
-int quiere[3] = {0, 0, 0};                                                       // Array con contadores de procesos esperando a la SC para cada tipo de prioridad
+#define N 3 // Número de nodos
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
+
+int token, id, seccion_critica, cola_msg = 0; // Testigos, ID del nodo, estado de la SC y la cola del nodo
+int vector_peticiones[3][N];              // Cola de solicitudes por atender
+int vector_atendidas[3][N];               // Cola de solicitudes atendidas
+
+int quiere[3] = {0, 0, 0};      // Vector de procesos que quieren por cada prioridad
+
+int espera_token = 0;           // Número de procesos a la espera de token
+sem_t token_solicitado_sem;     // Sem paso procesos espera token
+
+sem_t mutex_sc_sem;                 // Sem exclusion mutua de SC
 
 // Estructura de los mensajes
-struct msg_solicitud
+struct msg_nodo
 {
-    long mtype;                   // Tipo de mensaje, 0 -> solicitud de un escritor, 1 -> solicitud de un lector, 2 -> devolución de token copia
+    long mtype;                   // Tipo de mensaje, 1 -> token, 2 -> peticion nodo, 3 -> peticion cliente
     int id_nodo_origen;           // ID del nodo origen
     int num_peticion_nodo_origen; // Número de petición del nodo origen
     int prioridad_origen;         // Prioridad de la solicitud
+    int vector_atendidas[3][N];   // Vector atendidas
 };
 
-// Estructura para los mensajes de token
-struct msg_token
+/**
+ * Comprueba el vector quiere del nodo para determinar si hay procesos más prioritarios que el parámetro a la espera
+ * @param prioridad prioridad a comprobar
+ * @return devuelve 1 si la prioridad es más prioritaria que las que esperan en el nodo y 0 de lo contrario
+ */
+int prioridad_superior(int prioridad)
 {
-    long mtype;                       // 0 -> token original, 1 -> token copia
-    int id_nodo_origen;               // ID del nodo origen
-    int vector_atendidas_token[3][N]; // Vector de solicitudes atendidas
-};
+    for (int i = 0; i < prioridad; i++)
+    {
+        if (quiere[prioridad] != 0)
+            return 0;
+    }
+    return 1;
+}
 
-// Estructura para los mensajes de los clientes
-struct msg_cliente
-{
-    long mtype;    // Tipo de mensaje, 1 -> pago, 2 -> anulación, 3 -> reserva, 4 -> administración, 5 -> consulta
-    char mtext[1]; // Por definición, es necesario algún campo para almacenar datos, aunque no se quieran usar
-};
-
-// Función para enviar el testigo a otro nodo
-void enviar_token(int id_nodo_destino, int tipo)
+/**
+ * Envía el token a otro nodo especificado
+ * @param id_nodo id del nodo al que se envía el token
+ */
+void enviar_token(int id_nodo)
 {
     // Creamos el mensaje
-    struct msg_token msg_token;
-    msg_token.mtype = tipo; // 0 -> token original, 1 -> token copia
-    msg_token.id_nodo_origen = id;
+    struct msg_nodo msg_nodo = (const struct msg_nodo){0};
+    msg_nodo.mtype = TOKEN;
+    msg_nodo.id_nodo_origen = id;
     for (int j = 0; j < 3; j++)
     {
         for (int i = 0; i < N; i++)
         {
             // Introducimos el vector de atendidas en el mensaje
-            msg_token.vector_atendidas_token[j][i] = vector_atendidas[j][i];
+            msg_nodo.vector_atendidas[j][i] = vector_atendidas[j][i];
         }
     }
-
-    // Actualizamos el estado del testigo en el nodo
-    token = 0;
 
     // Enviamos el mensaje con el testigo
-    int msgid = msgget(NODO + id_nodo_destino, 0666);
-    msgsnd(msgid, &msg_token, sizeof(msg_token), 0);
+    int msgid = msgget(id_nodo + 1000, 0666);
+    msgsnd(msgid, &msg_nodo, sizeof(msg_nodo), 0);
 }
 
-// Proceso de pagos
-void *pagos()
+/**
+ * Broadcastea una request de la prioridad aportada a todos los otros nodos del SC
+ * @param prioridad prioridad de la request a broadcastear
+*/
+void broadcast(int prioridad)
 {
-    int prioridad = 0;
-    int msgid = msgget(CLIENTE + id, 0666 | IPC_CREAT); // Obtenemos el ID de la cola de mensajes de los clientes
-    struct msg_cliente msg_temp;                        // Creamos un struct para almacenar temporalmente el mensaje del cliente
+    // Creamos el mensaje de solicitud
+    struct msg_nodo msg_nodo = (const struct msg_nodo){0};
+    msg_nodo.mtype = REQUEST;
+    msg_nodo.id_nodo_origen = id;
+    vector_peticiones[prioridad][id]++;
+    msg_nodo.num_peticion_nodo_origen = vector_peticiones[prioridad][id];
+    msg_nodo.prioridad_origen = prioridad;
 
-    // Bucle principal
-    while (1)
+    // Lo enviamos a cada nodo
+    for (int i = (id + 1) % N; i != id; i = (i + 1) % N)
     {
-        // Esperamos a recibir un mensaje de cliente de tipo pago
-        msgrcv(msgid, &msg_temp, sizeof(msg_temp), 1, 0);
+        int msgid = msgget(i + 1000, 0666);
+        msgsnd(msgid, &msg_nodo, sizeof(msg_nodo), 0);
+    }
+}
 
-        printf("Un proceso de pagos quiere entrar a la sección crítica...\n");
+/**
+ * Comprueba si hay una petición activa por prioridad en este nodo
+ * @param prioridad prioridad de la petición
+ * @return 1 si hay una petición activa, 0 en caso contrario
+*/
+int peticion_activa(int prioridad){
+    return vector_peticiones[prioridad][id] > vector_atendidas[prioridad][id];
+}
 
-        // Apuntamos que un proceso de prioridad 0 quiere entrar a la sección crítica
-        quiere[prioridad]++;
-
-        // Si no tenemos el testigo, se envía una solicitud a cada nodo
-        if (!token)
-        {
-            printf("Petición de token...\n");
-
-            // Incrementamos el número de la solicitud
-            peticion += 1;
-
-            // Creamos el mensaje de solicitud
-            struct msg_solicitud msg_solicitud;
-            msg_solicitud.mtype = 0; // Solicitud de tipo escritor
-            msg_solicitud.id_nodo_origen = id;
-            msg_solicitud.num_peticion_nodo_origen = peticion;
-            msg_solicitud.prioridad_origen = prioridad;
-
-            // Lo enviamos a cada nodo
-            for (int i = (id + 1) % N; i != id; i = (i + 1) % N)
-            {
-                int msgid = msgget(NODO + i, 0666);
-                msgsnd(msgid, &msg_solicitud, sizeof(msg_solicitud), 0);
-            }
-
-            // Esperamos a recibir el testigo
-            struct msg_token msg_token;
-            int msgid = msgget(NODO + id, 0666);
-            msgrcv(msgid, &msg_token, sizeof(msg_token), 0, 0);
-            printf("Token recibido...\n");
-
-            // Actualizamos el vector de solicitudes atendidas con el recibido en el mensaje
-            for (int i = 0; i < N; i++)
-            {
-                vector_atendidas[prioridad][i] = msg_token.vector_atendidas_token[prioridad][i];
-            }
-
-            // Actualizamos el estado del testigo en el nodo
-            token = 1;
-        }
-
-        // Actualizamos el estado de la sección crítica en el nodo
-        seccion_critica = 1;
-
-        // Sección crítica
-        printf("Sección crítica...\n");
-        sleep(2);
-        printf("Saliendo de la sección crítica...\n");
-
-        // Apuntamos que un proceso de prioridad 0 ya no quiere entrar a la sección crítica
-        quiere[prioridad]--;
-        // Apuntamos que la petición ya está atendida si no quedan más peticiones de igual prioridad en el nodo
-        if (quiere[prioridad] == 0)
-        {
-            vector_atendidas[prioridad][id] = peticion;
-        }
-
-        // Actualizamos el estado de la sección crítica en el nodo
-        seccion_critica = 0;
-
-        int token_enviado = 0;
-        // Buscamos si hay algún nodo esperando por el testigo, ordenando por prioridad
-        for (int j = 0; j < 3; j++)
-        {
-            for (int i = (id + 1) % N; i != id; i = (i + 1) % N)
-            {
-                // Si lo hay, le pasamos el testigo
-                if (vector_peticiones[j][i] > vector_atendidas[j][i])
-                {
-                    token_enviado = 1;
-                    enviar_token(i, 0);
-                    break;
-                }
-            }
-            if (token_enviado)
-            {
-                break;
-            }
+/**
+ * Sustituye los valores del vector de atendidas por los del vector aportado como parametro
+ * @param vector_atendidas_nuevo nuevo vector de atendidas para el nodo
+*/
+void actualizar_atendidas(int vector_atendidas_nuevo[3][N]) {
+    for(int i = 0; i < 3; i++) {
+        for(int j = 0; j < N; j++) {
+            vector_atendidas[i][j] = vector_atendidas_nuevo[i][j];
         }
     }
 }
 
-// Proceso de anulaciones
-void *anulaciones()
-{
-    int prioridad = 0;
-    int msgid = msgget(CLIENTE + id, 0666 | IPC_CREAT); // Obtenemos el ID de la cola de mensajes de los clientes
-    struct msg_cliente msg_temp;                        // Creamos un struct para almacenar temporalmente el mensaje del cliente
-
-    // Bucle principal
-    while (1)
-    {
-        // Esperamos a recibir un mensaje de cliente de tipo anulación
-        msgrcv(msgid, &msg_temp, sizeof(msg_temp), 2, 0);
-
-        printf("Un proceso de anulaciones quiere entrar a la sección crítica...\n");
-
-        // Apuntamos que un proceso de prioridad 0 quiere entrar a la sección crítica
-        quiere[prioridad]++;
-
-        // Si no tenemos el testigo, se envía una solicitud a cada nodo
-        if (!token)
-        {
-            printf("Petición de token...\n");
-
-            // Incrementamos el número de la solicitud
-            peticion += 1;
-
-            // Creamos el mensaje de solicitud
-            struct msg_solicitud msg_solicitud;
-            msg_solicitud.mtype = 0; // Solicitud de tipo escritor
-            msg_solicitud.id_nodo_origen = id;
-            msg_solicitud.num_peticion_nodo_origen = peticion;
-            msg_solicitud.prioridad_origen = prioridad;
-
-            // Lo enviamos a cada nodo
-            for (int i = (id + 1) % N; i != id; i = (i + 1) % N)
-            {
-                int msgid = msgget(NODO + i, 0666);
-                msgsnd(msgid, &msg_solicitud, sizeof(msg_solicitud), 0);
-            }
-
-            // Esperamos a recibir el testigo
-            struct msg_token msg_token;
-            int msgid = msgget(NODO + id, 0666);
-            msgrcv(msgid, &msg_token, sizeof(msg_token), 0, 0);
-            printf("Token recibido...\n");
-
-            // Actualizamos el vector de solicitudes atendidas con el recibido en el mensaje
-            for (int i = 0; i < N; i++)
-            {
-                vector_atendidas[prioridad][i] = msg_token.vector_atendidas_token[prioridad][i];
-            }
-
-            // Actualizamos el estado del testigo en el nodo
-            token = 1;
+/**
+ * Determina el id del nodo siguiente teniendo en cuenta el vector de peticiones, atendidas y quiere.
+ * En caso de existir una petición más prioritaria de otro nodo que las que esperan en este nodo devuelve el id del nodo que ha hecho la petición prioritaria
+ * 
+ * @return id del nodo con la petición prioritaria o -1 en caso de no existir
+*/
+int buscar_nodo_siguiente() {
+    int prioridad_este_nodo = 3;
+    for(int i  = 0; i < 3; i++) {
+        if(quiere[i] > 0) {
+            prioridad_este_nodo = i;
         }
-
-        // Actualizamos el estado de la sección crítica en el nodo
-        seccion_critica = 1;
-
-        // Sección crítica
-        printf("Sección crítica...\n");
-        sleep(2);
-        printf("Saliendo de la sección crítica...\n");
-
-        // Apuntamos que un proceso de prioridad 0 ya no quiere entrar a la sección crítica
-        quiere[prioridad]--;
-        // Apuntamos que la petición ya está atendida si no quedan más peticiones de igual prioridad en el nodo
-        if (quiere[prioridad] == 0)
-        {
-            vector_atendidas[prioridad][id] = peticion;
-        }
-
-        // Actualizamos el estado de la sección crítica en el nodo
-        seccion_critica = 0;
-
-        int token_enviado = 0;
-        // Buscamos si hay algún nodo esperando por el testigo, ordenando por prioridad
-        for (int j = 0; j < 3; j++)
-        {
-            for (int i = (id + 1) % N; i != id; i = (i + 1) % N)
-            {
-                // Si lo hay, le pasamos el testigo
-                if (vector_peticiones[j][i] > vector_atendidas[j][i])
-                {
-                    token_enviado = 1;
-                    enviar_token(i, 0);
-                    break;
-                }
-            }
-            if (token_enviado)
-            {
-                break;
+    }
+    for(int i = 0; i < prioridad_este_nodo; i++) {
+        for(int j = (id + 1) % N; j != id; j = (j + 1) % N) {
+            if(vector_peticiones[i][j] > vector_atendidas[i][j]) {
+                return j;
             }
         }
     }
+    return -1;
 }
 
-// Proceso de reservas
-void *reservas()
+void *t0(void *args)
 {
-    int prioridad = 1;
-    int msgid = msgget(CLIENTE + id, 0666 | IPC_CREAT); // Obtenemos el ID de la cola de mensajes de los clientes
-    struct msg_cliente msg_temp;                        // Creamos un struct para almacenar temporalmente el mensaje del cliente
-
-    // Bucle principal
     while (1)
     {
-        // Esperamos a recibir un mensaje de cliente de tipo reserva
-        msgrcv(msgid, &msg_temp, sizeof(msg_temp), 3, 0);
-
-        printf("Un proceso de reservas quiere entrar a la sección crítica...\n");
-
-        // Apuntamos que un proceso de prioridad 1 quiere entrar a la sección crítica
-        quiere[prioridad]++;
-
-        // Si no tenemos el testigo, se envía una solicitud a cada nodo
-        if (!token)
-        {
-            printf("Petición de token...\n");
-
-            // Incrementamos el número de la solicitud
-            peticion += 1;
-
-            // Creamos el mensaje de solicitud
-            struct msg_solicitud msg_solicitud;
-            msg_solicitud.mtype = 0; // Solicitud de tipo escritor
-            msg_solicitud.id_nodo_origen = id;
-            msg_solicitud.num_peticion_nodo_origen = peticion;
-            msg_solicitud.prioridad_origen = prioridad;
-
-            // Lo enviamos a cada nodo
-            for (int i = (id + 1) % N; i != id; i = (i + 1) % N)
-            {
-                int msgid = msgget(NODO + i, 0666);
-                msgsnd(msgid, &msg_solicitud, sizeof(msg_solicitud), 0);
+        struct msg_nodo msg_cliente = (const struct msg_nodo){0};
+        // Recibir peticion cliente
+        msgrcv(cola_msg, &msg_cliente, sizeof(msg_cliente), PAGOS, 0);
+        
+        quiere[0]++;
+        
+        if(!token) {
+            if(!peticion_activa(0)) {
+                broadcast(0);
             }
-
-            // Esperamos a recibir el testigo
-            struct msg_token msg_token;
-            int msgid = msgget(NODO + id, 0666);
-            msgrcv(msgid, &msg_token, sizeof(msg_token), 0, 0);
-            printf("Token recibido...\n");
-
-            // Actualizamos el vector de solicitudes atendidas con el recibido en el mensaje
-            for (int i = 0; i < N; i++)
-            {
-                vector_atendidas[prioridad][i] = msg_token.vector_atendidas_token[prioridad][i];
-            }
-
-            // Actualizamos el estado del testigo en el nodo
-            token = 1;
-        }
-
-        // Actualizamos el estado de la sección crítica en el nodo
-        seccion_critica = 1;
-
-        // Sección crítica
-        printf("Sección crítica...\n");
-        sleep(2);
-        printf("Saliendo de la sección crítica...\n");
-
-        // Apuntamos que un proceso de prioridad 1 ya no quiere entrar a la sección crítica
-        quiere[prioridad]--;
-        // Apuntamos que la petición ya está atendida si no quedan más peticiones de igual prioridad en el nodo
-        if (quiere[prioridad] == 0)
-        {
-            vector_atendidas[prioridad][id] = peticion;
-        }
-
-        // Actualizamos el estado de la sección crítica en el nodo
-        seccion_critica = 0;
-
-        int token_enviado = 0;
-        // Buscamos si hay algún nodo esperando por el testigo, ordenando por prioridad
-        for (int j = 0; j < 3; j++)
-        {
-            for (int i = (id + 1) % N; i != id; i = (i + 1) % N)
-            {
-                // Si lo hay, le pasamos el testigo
-                if (vector_peticiones[j][i] > vector_atendidas[j][i])
-                {
-                    token_enviado = 1;
-                    enviar_token(i, 0);
-                    break;
-                }
-            }
-            if (token_enviado)
-            {
-                break;
-            }
-        }
-    }
-}
-
-// Proceso de administración
-void *administracion()
-{
-    int prioridad = 1;
-    int msgid = msgget(CLIENTE + id, 0666 | IPC_CREAT); // Obtenemos el ID de la cola de mensajes de los clientes
-    struct msg_cliente msg_temp;                        // Creamos un struct para almacenar temporalmente el mensaje del cliente
-
-    // Bucle principal
-    while (1)
-    {
-        // Esperamos a recibir un mensaje de cliente de tipo administración
-        msgrcv(msgid, &msg_temp, sizeof(msg_temp), 4, 0);
-
-        printf("Un proceso de administracion quiere entrar a la sección crítica...\n");
-
-        // Apuntamos que un proceso de prioridad 1 quiere entrar a la sección crítica
-        quiere[prioridad]++;
-
-        // Si no tenemos el testigo, se envía una solicitud a cada nodo
-        if (!token)
-        {
-            printf("Petición de token...\n");
-
-            // Incrementamos el número de la solicitud
-            peticion += 1;
-
-            // Creamos el mensaje de solicitud
-            struct msg_solicitud msg_solicitud;
-            msg_solicitud.mtype = 0; // Solicitud de tipo escritor
-            msg_solicitud.id_nodo_origen = id;
-            msg_solicitud.num_peticion_nodo_origen = peticion;
-            msg_solicitud.prioridad_origen = prioridad;
-
-            // Lo enviamos a cada nodo
-            for (int i = (id + 1) % N; i != id; i = (i + 1) % N)
-            {
-                int msgid = msgget(NODO + i, 0666);
-                msgsnd(msgid, &msg_solicitud, sizeof(msg_solicitud), 0);
-            }
-
-            // Esperamos a recibir el testigo
-            struct msg_token msg_token;
-            int msgid = msgget(NODO + id, 0666);
-            msgrcv(msgid, &msg_token, sizeof(msg_token), 0, 0);
-            printf("Token recibido...\n");
-
-            // Actualizamos el vector de solicitudes atendidas con el recibido en el mensaje
-            for (int i = 0; i < N; i++)
-            {
-                vector_atendidas[prioridad][i] = msg_token.vector_atendidas_token[prioridad][i];
-            }
-
-            // Actualizamos el estado del testigo en el nodo
-            token = 1;
-        }
-
-        // Actualizamos el estado de la sección crítica en el nodo
-        seccion_critica = 1;
-
-        // Sección crítica
-        printf("Sección crítica...\n");
-        sleep(2);
-        printf("Saliendo de la sección crítica...\n");
-
-        // Apuntamos que un proceso de prioridad 1 ya no quiere entrar a la sección crítica
-        quiere[prioridad]--;
-        // Apuntamos que la petición ya está atendida si no quedan más peticiones de igual prioridad en el nodo
-        if (quiere[prioridad] == 0)
-        {
-            vector_atendidas[prioridad][id] = peticion;
-        }
-
-        // Actualizamos el estado de la sección crítica en el nodo
-        seccion_critica = 0;
-
-        int token_enviado = 0;
-        // Buscamos si hay algún nodo esperando por el testigo, ordenando por prioridad
-        for (int j = 0; j < 3; j++)
-        {
-            for (int i = (id + 1) % N; i != id; i = (i + 1) % N)
-            {
-                // Si lo hay, le pasamos el testigo
-                if (vector_peticiones[j][i] > vector_atendidas[j][i])
-                {
-                    token_enviado = 1;
-                    enviar_token(i, 0);
-                    break;
-                }
-            }
-            if (token_enviado)
-            {
-                break;
-            }
-        }
-    }
-}
-
-// Proceso de consultas
-void *consultas()
-{
-    int prioridad = 2;
-    int msgid = msgget(CLIENTE + id, 0666 | IPC_CREAT); // Obtenemos el ID de la cola de mensajes de los clientes
-    struct msg_cliente msg_temp;                        // Creamos un struct para almacenar temporalmente el mensaje del cliente
-
-    // Bucle principal
-    while (1)
-    {
-        // Esperamos a recibir un mensaje de cliente de tipo consulta
-        msgrcv(msgid, &msg_temp, sizeof(msg_temp), 5, 0);
-
-        printf("Un proceso de consultas quiere entrar a la sección crítica...\n");
-
-        int id_nodo_origen, tipo_token; // Variables para almacenar el ID del nodo que nos envía el token, y el tipo de token recibido
-
-        // Apuntamos que un proceso de prioridad 2 quiere entrar a la sección crítica
-        quiere[prioridad]++;
-
-        // Si no tenemos el testigo, ni uno copia, se envía una solicitud a cada nodo
-        if (!token && !token_lector)
-        {
-            printf("Petición de token...\n");
-
-            // Incrementamos el número de la solicitud
-            peticion += 1;
-
-            // Creamos el mensaje de solicitud
-            struct msg_solicitud msg_solicitud;
-            msg_solicitud.mtype = 1; // Solicitud de tipo lector
-            msg_solicitud.id_nodo_origen = id;
-            msg_solicitud.num_peticion_nodo_origen = peticion;
-            msg_solicitud.prioridad_origen = prioridad;
-
-            // Lo enviamos a cada nodo
-            for (int i = (id + 1) % N; i != id; i = (i + 1) % N)
-            {
-                int msgid = msgget(NODO + i, 0666);
-                msgsnd(msgid, &msg_solicitud, sizeof(msg_solicitud), 0);
-            }
-
-            // Esperamos a recibir el testigo
-            struct msg_token msg_token;
-            int msgid = msgget(NODO + id, 0666);
-            msgrcv(msgid, &msg_token, sizeof(msg_token), 0, 0);
-            printf("Token recibido...\n");
-            id_nodo_origen = msg_token.id_nodo_origen;
-            tipo_token = msg_token.mtype; // 0 -> token original, 1 -> token copia
-
-            // Actualizamos el vector de solicitudes atendidas con el recibido en el mensaje
-            for (int i = 0; i < N; i++)
-            {
-                vector_atendidas[prioridad][i] = msg_token.vector_atendidas_token[prioridad][i];
-            }
-
-            // Diferenciamos si hemos recibido el token original o una copia
-            if (tipo_token == 0)
-            {
+            if(espera_token) {
+                espera_token++;
+                sem_wait(&token_solicitado_sem);
+            } else {
+                espera_token++;
+                struct msg_nodo msg_token = (const struct msg_nodo){0};
+                // Recibir token
+                msgrcv(cola_msg, &msg_token, sizeof(msg_token), TOKEN, 0);
+                actualizar_atendidas(msg_token.vector_atendidas);
                 token = 1;
-            }
-            else
-            {
-                token_lector = 1;
+                // Despertar a los procesos que esperaban el token
+                for (int i = 1; i < espera_token; i++) {
+                    sem_post(&token_solicitado_sem);
+                }
+                espera_token = 0;
             }
         }
 
-        // Si tenemos el token original (somos el primer lector), apuntamos que hay lectores en sección crítica
-        if (token)
-        {
-            sc_lectores = 1;
-        }
-
-        // Actualizamos el estado de la sección crítica en el nodo
+        sem_wait(&mutex_sc_sem);
         seccion_critica = 1;
-
-        // Sección crítica
-        printf("Sección crítica...\n");
-        sleep(2);
-        printf("Saliendo de la sección crítica...\n");
-
-        // Apuntamos que un proceso de prioridad 2 ya no quiere entrar a la sección crítica
-        quiere[prioridad]--;
-        // Apuntamos que la petición ya está atendida si no quedan más peticiones de igual prioridad en el nodo
-        if (quiere[prioridad] == 0)
-        {
-            vector_atendidas[prioridad][id] = peticion;
-        }
-
-        // Actualizamos el estado de la sección crítica en el nodo
+        // SECCIÓN CRÍTICA
         seccion_critica = 0;
+        sem_post(&mutex_sc_sem);
 
-        // Si ya no hay lectores en sección crítica (somos el último) lo apuntamos
-        /*if (lista_vacia())
-        {
-            sc_lectores = 0;
-        }*/
-
-        // Si teníamos un testigo copia, enviamos un mensaje al nodo que nos lo envió para informarle de que hemos terminado
-        if (token_lector == 1)
-        {
-            // Creamos el mensaje
-            struct msg_solicitud msg_solicitud;
-            msg_solicitud.mtype = 2; // Devolución de token copia
-            msg_solicitud.id_nodo_origen = id;
-            msg_solicitud.num_peticion_nodo_origen = peticion;
-            msg_solicitud.prioridad_origen = prioridad;
-            // Lo enviamos al nodo que nos envió el token
-            int msgid = msgget(NODO + id_nodo_origen, 0666);
-            msgsnd(msgid, &msg_solicitud, sizeof(msg_solicitud), 0);
-        }
-        // Si teníamos el testigo original, buscamos si hay algún nodo esperando por el testigo, ordenando por prioridad
-        else
-        {
-            int token_enviado = 0;
-            for (int j = 0; j < 3; j++)
-            {
-                for (int i = (id + 1) % N; i != id; i = (i + 1) % N)
-                {
-                    // Si lo hay, le pasamos el testigo
-                    if (vector_peticiones[j][i] > vector_atendidas[j][i])
-                    {
-                        token_enviado = 1;
-                        enviar_token(i, 0);
-                        break;
-                    }
-                }
-                if (token_enviado)
-                {
-                    break;
-                }
+        quiere[0]--;
+        if(quiere[0] == 0) {
+            vector_atendidas[0][id] = vector_peticiones[0][id];
+            int nodo_siguiente = buscar_nodo_siguiente();
+            if(nodo_siguiente > 0) {
+                token = 0;
+                enviar_token(nodo_siguiente);
             }
         }
     }
 }
 
-// Proceso principal
-int main(int argc, char *argv[])
+void receptor()
 {
+    while (1)
+    {
+        struct msg_nodo msg_peticion = (const struct msg_nodo){0};
+        // Recibir peticion
+        msgrcv(cola_msg, &msg_peticion, sizeof(msg_peticion), REQUEST, 0);
+        // Actualizar vector peticiones
+        vector_peticiones[msg_peticion.prioridad_origen][msg_peticion.id_nodo_origen] = MAX(vector_peticiones[msg_peticion.prioridad_origen][msg_peticion.id_nodo_origen], msg_peticion.num_peticion_nodo_origen);
+        // Pasar token si procede
+        if (token && !seccion_critica && prioridad_superior(msg_peticion.prioridad_origen) && (vector_peticiones[msg_peticion.prioridad_origen][msg_peticion.id_nodo_origen] > vector_atendidas[msg_peticion.prioridad_origen][msg_peticion.id_nodo_origen]))
+        {
+            token = 0;
+            enviar_token(msg_peticion.id_nodo_origen);
+        }
+    }
+}
+
+void main(int argc, char *argv[])
+{
+    // Inicializar arrays
+    for(int i = 0; i < 3; i++) {
+        for(int j = 0; j < N; j++) {
+            vector_atendidas[i][j] = 0;
+            vector_peticiones[i][j] = 0;
+        }
+    }
+
     id = atoi(argv[1]); // ID del nodo
 
-    // Le damos el token al nodo con ID = 0
-    if (id == 0)
-    {
+    if(id == 0) {
         token = 1;
     }
 
-    int msgid;
-
-    // Creamos la cola para recibir mensajes de los clientes
-    msgid = msgget(CLIENTE + id, 0666 | IPC_CREAT);
-    if (msgid != -1)
+    // Incializar cola nodo
+    cola_msg = msgget(1000 + id, 0666 | IPC_CREAT);
+    if (cola_msg != -1)
     {
-        msgctl(msgid, IPC_RMID, NULL);
+        msgctl(cola_msg, IPC_RMID, NULL);
+        cola_msg = msgget(1000 + id, 0666 | IPC_CREAT);
     }
 
-    // Creamos la cola para recibir mensajes de los nodos
-    msgid = msgget(NODO + id, 0666 | IPC_CREAT);
-    if (msgid != -1)
+    // Inicialización sem
+    sem_init(&token_solicitado_sem, 0, 0);
+    sem_init(&mutex_sc_sem, 0, 1);
+
+    // Se crean 10 hilos t0
+    pthread_t hilo_t0[10];
+    for (int i = 0; i < 10; i++)
     {
-        msgctl(msgid, IPC_RMID, NULL);
+        pthread_create(&hilo_t0[i], NULL, t0, NULL);
     }
 
-    // Creamos el hilo receptor, y un hilo para cada tipo de proceso
-    pthread_t hilo_pagos;
-    pthread_t hilo_anulaciones;
-    pthread_t hilo_reservas;
-    pthread_t hilo_administracion;
-    pthread_t hilo_consultas;
-    pthread_create(&hilo_pagos, NULL, pagos, NULL);
-    pthread_create(&hilo_anulaciones, NULL, anulaciones, NULL);
-    pthread_create(&hilo_reservas, NULL, reservas, NULL);
-    pthread_create(&hilo_administracion, NULL, administracion, NULL);
-    pthread_create(&hilo_consultas, NULL, consultas, NULL);
-
-    // Variables para almacenar la información recibida de los mensajes
-    int id_nodo_origen, num_peticion_nodo_origen, prioridad_origen, tipo_origen;
-
-    // Bucle receptor
-    while (1)
-    {
-        // Esperamos a recibir una petición
-        struct msg_solicitud msg_solicitud;
-        int msgid = msgget(NODO + id, 0666);
-        msgrcv(msgid, &msg_solicitud, sizeof(msg_solicitud), 0, 0);
-
-        // Obtenemos los datos del mensaje
-        tipo_origen = msg_solicitud.mtype;                                 // Tipo de mensaje, 0 -> solicitud de un escritor, 1 -> solicitud de un lector, 2 -> devolución de token copia
-        id_nodo_origen = msg_solicitud.id_nodo_origen;                     // ID del nodo solicitante
-        num_peticion_nodo_origen = msg_solicitud.num_peticion_nodo_origen; // Número de petición de solicitud
-        prioridad_origen = msg_solicitud.prioridad_origen;                 // Prioridad de la solicitud
-
-        // Actualizamos el vector de peticiones pendientes
-        vector_peticiones[prioridad_origen][id_nodo_origen] = num_peticion_nodo_origen > vector_peticiones[prioridad_origen][id_nodo_origen] ? num_peticion_nodo_origen : vector_peticiones[prioridad_origen][id_nodo_origen];
-
-        // Si lo que recibimos es la devolución de un token copia, eliminamos el nodo de la lista
-        if (tipo_origen == 2)
-        {
-            // eliminar_lista(id_nodo_origen);
-        }
-        // Si recibimos una solicitud de un lector, y ya hay un lector en sección crítica, enviamos un token copia, y añadimos el ID del nodo solicitante a la lista
-        else if (tipo_origen == 1 && sc_lectores == 1)
-        {
-            // anadir_lista(id_nodo_origen);
-            enviar_token(id_nodo_origen, 1);
-        }
-        // Si tenemos el testigo, no estamos en la sección crítica y la petición es nueva, pasamos el testigo original
-        else if (token && !seccion_critica && vector_peticiones[prioridad_origen][id_nodo_origen] > vector_atendidas[prioridad_origen][id_nodo_origen])
-        {
-            enviar_token(id_nodo_origen, 0);
-        }
-    }
+    receptor();
 }
