@@ -10,6 +10,8 @@
 #define ADMINISTRACION 14 // Mensajes de solicitud de administración
 #define CONSULTAS 15      // Mensajes de solicitud de consultas
 
+#define MAX(a, b) (((a) > (b)) ? (a) : (b)) // Cálculo de valor máximo entre dos variables
+
 // Estructura de los mensajes
 struct msg_nodo
 {

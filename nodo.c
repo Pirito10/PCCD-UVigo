@@ -8,8 +8,6 @@
 
 #include "utils.h" // Archivo de cabecera con la definición de las funciones y estructura de los mensajes
 
-#define MAX(a, b) (((a) > (b)) ? (a) : (b)) // Cálculo de valor máximo entre dos variables
-
 int token, id, seccion_critica; // Testigo, ID del nodo y estado de la SC
 int vector_peticiones[3][N];    // Cola de solicitudes por atender
 int vector_atendidas[3][N];     // Cola de solicitudes atendidas
