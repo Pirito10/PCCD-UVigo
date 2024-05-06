@@ -402,7 +402,7 @@ void receptor()
                 token = 0;
                 enviar_token(msg_peticion.id_nodo_origen);
             }
-            else if (paso_consultas && msg_peticion.prioridad_origen == 2 && (vector_peticiones[2][msg_peticion.id_nodo_origen] > vector_atendidas[2][msg_peticion.id_nodo_origen]))
+            else if (token && paso_consultas && msg_peticion.prioridad_origen == 2 && (vector_peticiones[2][msg_peticion.id_nodo_origen] > vector_atendidas[2][msg_peticion.id_nodo_origen]))
             {
                 printf("[NODO %d][RECEPTOR] -> enviando token consultas a nodo %d\n", id, msg_peticion.id_nodo_origen);
                 enviar_token_consulta(msg_peticion.id_nodo_origen);
