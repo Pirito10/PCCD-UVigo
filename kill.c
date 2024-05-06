@@ -44,6 +44,6 @@ int main(int argc, char *argv[])
             continue;
         }
 
-        printf("Nodo %d terminado\n\n", i);
+        printf("Nodo %d terminado\n", i);
     }
 }
