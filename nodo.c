@@ -90,7 +90,7 @@ void *t0(void *args)
             vector_atendidas[0][id] = vector_peticiones[0][id];
         }
         int nodo_siguiente = buscar_nodo_siguiente();
-        if (nodo_siguiente > 0)
+        if (nodo_siguiente >= 0)
         {
             printf("[NODO %d][%s %d] -> peticion prioritaria en nodo %d, enviando token\n", id, info->nombre, info->thread_num, nodo_siguiente);
             token = 0;
@@ -98,7 +98,7 @@ void *t0(void *args)
         }
         if (procesos_quieren())
         {
-            if (nodo_siguiente > 0)
+            if (nodo_siguiente >= 0)
             {
                 hacer_peticiones();
             }
@@ -172,6 +172,7 @@ void *t1(void *args)
         seccion_critica = 1;
         printf("[NODO %d][%s %d] -> seccion critica\n", id, info->nombre, info->thread_num);
         // SECCIÓN CRÍTICA
+        sleep(10);
         seccion_critica = 0;
         sem_post(&mutex_sc_sem);
 
@@ -183,7 +184,7 @@ void *t1(void *args)
             vector_atendidas[1][id] = vector_peticiones[1][id];
         }
         int nodo_siguiente = buscar_nodo_siguiente();
-        if (nodo_siguiente > 0)
+        if (nodo_siguiente >= 0)
         {
             printf("[NODO %d][%s %d] -> peticion prioritaria en nodo %d, enviando token\n", id, info->nombre, info->thread_num, nodo_siguiente);
             token = 0;
@@ -191,7 +192,7 @@ void *t1(void *args)
         }
         if (procesos_quieren())
         {
-            if (nodo_siguiente > 0)
+            if (nodo_siguiente >= 0)
             {
                 hacer_peticiones();
             }
@@ -227,6 +228,7 @@ void *t2(void *args)
             proceso_despertado = 0;
             if ((!(token || token_consulta)) && !peticion_activa(2))
             {
+                printf("[NODO %d][%s %d] -> solicitando token\n", id, info->nombre, info->thread_num);
                 broadcast(2);
             }
 
@@ -234,17 +236,20 @@ void *t2(void *args)
             {
                 if (!paso_consultas)
                 {
+                    printf("[NODO %d][%s %d] -> nodo activo, esperando ser atendido\n", id, info->nombre, info->thread_num);
                     cola_t2++;
                     sem_wait(&cola_t2_sem);
                 }
             }
             else
             {
+                printf("[NODO %d][%s %d] -> nodo inactivo, intentando entrar\n", id, info->nombre, info->thread_num);
                 nodo_activo = 1;
             }
 
             if (!(token || token_consulta))
             {
+                printf("[NODO %d][%s %d] -> no hay token, realizando solicitud\n", id, info->nombre, info->thread_num);
                 struct msg_nodo msg_token = (const struct msg_nodo){0};
                 // Recibir token
                 msgrcv(cola_msg, &msg_token, sizeof(msg_token), TOKEN, 0);
@@ -256,6 +261,7 @@ void *t2(void *args)
                 }
                 else
                 {
+                    printf("[NODO %d][%s %d] -> token recibido\n", id, info->nombre, info->thread_num);
                     token = 1;
                 }
             }
@@ -294,7 +300,7 @@ void *t2(void *args)
             vector_atendidas[2][id] = vector_peticiones[2][id];
         }
         int nodo_siguiente = buscar_nodo_siguiente();
-        if (nodo_siguiente > 0 || quiere[0] || quiere[1])
+        if (nodo_siguiente >= 0 || quiere[0] || quiere[1])
         {
             paso_consultas = 0;
             if (consultas_sc == 0)
@@ -316,14 +322,14 @@ void *t2(void *args)
                 primera_consulta = 1;
 
                 nodo_siguiente = buscar_nodo_siguiente();
-                if (token && nodo_siguiente > 0)
+                if (token && nodo_siguiente >= 0)
                 {
                     token = 0;
                     enviar_token(nodo_siguiente);
                 }
                 if (procesos_quieren())
                 {
-                    if (nodo_siguiente > 0)
+                    if (nodo_siguiente >= 0)
                     {
                         hacer_peticiones();
                     }
