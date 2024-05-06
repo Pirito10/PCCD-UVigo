@@ -310,12 +310,12 @@ void *t2(void *args)
         if (nodo_siguiente >= 0 || quiere[0] || quiere[1])
         {
             paso_consultas = 0;
-            printf("[NODO %d][%s %d] -> proceso prioritario quiere, parando consultas\n", id, info->nombre, info->thread_num, nodo_siguiente);
+            printf("[NODO %d][%s %d] -> proceso prioritario quiere, parando consultas\n", id, info->nombre, info->thread_num);
             if (consultas_sc == 0)
             {
                 if (token_consulta)
                 {
-                    printf("[NODO %d][%s %d] -> ultima consulta, devolviendo token consulta\n", id, info->nombre, info->thread_num, nodo_siguiente);
+                    printf("[NODO %d][%s %d] -> ultima consulta, devolviendo token consulta\n", id, info->nombre, info->thread_num);
                     token_consulta = 0;
                     devolver_token_consulta();
                 }
@@ -323,11 +323,11 @@ void *t2(void *args)
                 {
                     if (!lista_vacia())
                     {
-                        printf("[NODO %d][%s %d] -> ultima consulta, esperando devolucion\n", id, info->nombre, info->thread_num, nodo_siguiente);
+                        printf("[NODO %d][%s %d] -> ultima consulta, esperando devolucion\n", id, info->nombre, info->thread_num);
                         sem_wait(&lista_vacia_sem);
                     }
                 }
-                printf("[NODO %d][%s %d] -> ultima consulta, saliendo de SC\n", id, info->nombre, info->thread_num, nodo_siguiente);
+                printf("[NODO %d][%s %d] -> ultima consulta, saliendo de SC\n", id, info->nombre, info->thread_num);
                 seccion_critica = 0;
                 sem_post(&mutex_sc_sem);
                 primera_consulta = 1;
