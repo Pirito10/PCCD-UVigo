@@ -39,6 +39,13 @@ void actualizar_atendidas(int vector_atendidas_nuevo[3][N]);
 int buscar_nodo_siguiente();
 int peticion_activa(int prioridad);
 int prioridad_superior(int prioridad);
+
+int procesos_quieren();
+void hacer_peticiones();
+void despertar_siguiente();
+void devolver_token_consulta();
+void enviar_token_consulta(int id_nodo);
+
 void anadir_lista(int id);
 void quitar_lista(int id);
 int lista_vacia();
