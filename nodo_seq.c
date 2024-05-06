@@ -400,6 +400,10 @@ int main(int argc, char *argv[])
 
     // Inicializamos los semáforos
     sem_init(&mutex_sc_sem, 0, 1);
+    sem_init(&cola_t0_sem, 0, 0);
+    sem_init(&cola_t1_sem, 0, 0);
+    sem_init(&cola_t2_sem, 0, 0);
+    sem_init(&lista_vacia_sem, 0, 0);
 
     // Incializamos la cola de mensajes del nodo
     cola_msg = msgget(1000 + id, 0666 | IPC_CREAT);
@@ -438,11 +442,11 @@ int main(int argc, char *argv[])
     }*/
 
     // Creamos los hilos de tipo CONSULTAS
-    /*pthread_t hilo_t2[num_hilos[4]];
+    pthread_t hilo_t2[num_hilos[4]];
     for (int i = 0; i < num_hilos[4]; i++)
     {
         pthread_create(&hilo_t2[4], NULL, t2, NULL);
-    }*/
+    }
 
     // Creamos el hilo que espera un mensaje para terminar el programa
     pthread_t hilo_kill;
