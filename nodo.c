@@ -7,6 +7,7 @@
 #include <semaphore.h>
 #include <signal.h>
 #include <sys/msg.h>
+#include <string.h>
 
 #include "utils.h" // Archivo de cabecera con la definición de las funciones y estructura de los mensajes
 
@@ -29,57 +30,69 @@ int quiere[3] = {0, 0, 0}; // Vector de procesos que quieren SC por cada priorid
 
 sem_t mutex_sc_sem; // Semáforo de exclusión mutua de SC
 
-// Hilo de tipo PAGOS
+// Hilo de tipo PAGOS/ANULACIONES
 void *t0(void *args)
 {
-    printf("[Nodo %d] -> proceso PAGOS creado\n", id);
+    struct thread_info *info = args;
+
+    printf("[NODO %d][%s %d] -> proceso creado\n", id, info->nombre, info->thread_num);
     while (1)
     {
         struct msg_nodo msg_cliente = (const struct msg_nodo){0};
-        // Esperamos a recibir una solicitud de pago de un cliente
-        msgrcv(cola_msg, &msg_cliente, sizeof(msg_cliente), PAGOS, 0);
+        // Esperamos a recibir una solicitud de pago/anulacion de un cliente
+        msgrcv(cola_msg, &msg_cliente, sizeof(msg_cliente), info->tipo, 0);
 
         quiere[0]++;
 
         if ((!token || !lista_vacia()) && !peticion_activa(0))
         {
+            printf("[NODO %d][%s %d] -> solicitando token\n", id, info->nombre, info->thread_num);
             broadcast(0);
         }
 
         if (nodo_activo)
         {
+            printf("[NODO %d][%s %d] -> nodo activo, esperando ser atendido\n", id, info->nombre, info->thread_num);
             cola_t0++;
             sem_wait(&cola_t0_sem);
+            printf("[NODO %d][%s %d] -> proceso despertado, intentando entrar\n", id, info->nombre, info->thread_num);
         }
         else
         {
+            printf("[NODO %d][%s %d] -> nodo inactivo, intentando entrar\n", id, info->nombre, info->thread_num);
             nodo_activo = 1;
         }
 
         if (!token)
         {
+            printf("[NODO %d][%s %d] -> no hay token, realizando solicitud\n", id, info->nombre, info->thread_num);
             struct msg_nodo msg_token = (const struct msg_nodo){0};
             // Recibir token
             msgrcv(cola_msg, &msg_token, sizeof(msg_token), TOKEN, 0);
             actualizar_atendidas(msg_token.vector_atendidas);
             token = 1;
+            printf("[NODO %d][%s %d] -> token recibido\n", id, info->nombre, info->thread_num);
         }
 
         sem_wait(&mutex_sc_sem);
         seccion_critica = 1;
+        printf("[NODO %d][%s %d] -> seccion critica\n", id, info->nombre, info->thread_num);
         // SECCIÓN CRÍTICA
+        sleep(10);
         seccion_critica = 0;
         sem_post(&mutex_sc_sem);
 
         quiere[0]--;
-
+        printf("[NODO %d][%s %d] -> ha salido seccion critica\n", id, info->nombre, info->thread_num);
         if (quiere[0] == 0)
         {
+            printf("[NODO %d][%s %d] -> ultimo proceso ha salido, actualizando atendidas\n", id, info->nombre, info->thread_num);
             vector_atendidas[0][id] = vector_peticiones[0][id];
         }
         int nodo_siguiente = buscar_nodo_siguiente();
         if (nodo_siguiente > 0)
         {
+            printf("[NODO %d][%s %d] -> peticion prioritaria en nodo %d, enviando token\n", id, info->nombre, info->thread_num, nodo_siguiente);
             token = 0;
             enviar_token(nodo_siguiente);
         }
@@ -89,24 +102,28 @@ void *t0(void *args)
             {
                 hacer_peticiones();
             }
+            printf("[NODO %d][%s %d] -> despertando siguiente\n", id, info->nombre, info->thread_num);
             despertar_siguiente();
         }
         else
         {
+            printf("[NODO %d][%s %d] -> nodo en espera\n", id, info->nombre, info->thread_num);
             nodo_activo = 0;
         }
     }
 }
 
-// Hilo de tipo RESERVAS
+// Hilo de tipo RESERVAS/ADMINISTRACION
 void *t1(void *args)
 {
-    printf("[Nodo %d] -> proceso RESERVAS creado\n", id);
+    struct thread_info *info = args;
+
+    printf("[NODO %d][%s %d] -> proceso creado\n", id, info->nombre, info->thread_num);
     while (1)
     {
         struct msg_nodo msg_cliente = (const struct msg_nodo){0};
         // Recibir peticion cliente
-        msgrcv(cola_msg, &msg_cliente, sizeof(msg_cliente), RESERVAS, 0);
+        msgrcv(cola_msg, &msg_cliente, sizeof(msg_cliente), info->tipo, 0);
 
         quiere[1]++;
 
@@ -116,29 +133,36 @@ void *t1(void *args)
             proceso_despertado = 0;
             if ((!token || !lista_vacia()) && !peticion_activa(1))
             {
+                printf("[NODO %d][%s %d] -> solicitando token\n", id, info->nombre, info->thread_num);
                 broadcast(1);
             }
 
             if (nodo_activo)
             {
+                printf("[NODO %d][%s %d] -> nodo activo, esperando ser atendido\n", id, info->nombre, info->thread_num);
                 cola_t1++;
                 sem_wait(&cola_t1_sem);
+                printf("[NODO %d][%s %d] -> proceso despertado, intentando entrar\n", id, info->nombre, info->thread_num);
             }
             else
             {
+                printf("[NODO %d][%s %d] -> nodo inactivo, intentando entrar\n", id, info->nombre, info->thread_num);
                 nodo_activo = 1;
             }
 
             if (!token)
             {
+                printf("[NODO %d][%s %d] -> no hay token, realizando solicitud\n", id, info->nombre, info->thread_num);
                 struct msg_nodo msg_token = (const struct msg_nodo){0};
                 // Recibir token
                 msgrcv(cola_msg, &msg_token, sizeof(msg_token), TOKEN, 0);
                 actualizar_atendidas(msg_token.vector_atendidas);
                 token = 1;
+                printf("[NODO %d][%s %d] -> token recibido\n", id, info->nombre, info->thread_num);
             }
             if (quiere[0] > 0)
             {
+                printf("[NODO %d][%s %d] -> proceso prioritario a la espera, dando paso\n", id, info->nombre, info->thread_num);
                 proceso_despertado = 1;
                 despertar_siguiente();
             }
@@ -146,19 +170,22 @@ void *t1(void *args)
 
         sem_wait(&mutex_sc_sem);
         seccion_critica = 1;
+        printf("[NODO %d][%s %d] -> seccion critica\n", id, info->nombre, info->thread_num);
         // SECCIÓN CRÍTICA
         seccion_critica = 0;
         sem_post(&mutex_sc_sem);
 
         quiere[1]--;
-
+        printf("[NODO %d][%s %d] -> ha salido seccion critica\n", id, info->nombre, info->thread_num);
         if (quiere[1] == 0)
         {
+            printf("[NODO %d][%s %d] -> ultimo proceso ha salido, actualizando atendidas\n", id, info->nombre, info->thread_num);
             vector_atendidas[1][id] = vector_peticiones[1][id];
         }
         int nodo_siguiente = buscar_nodo_siguiente();
         if (nodo_siguiente > 0)
         {
+            printf("[NODO %d][%s %d] -> peticion prioritaria en nodo %d, enviando token\n", id, info->nombre, info->thread_num, nodo_siguiente);
             token = 0;
             enviar_token(nodo_siguiente);
         }
@@ -168,10 +195,12 @@ void *t1(void *args)
             {
                 hacer_peticiones();
             }
+            printf("[NODO %d][%s %d] -> despertando siguiente\n", id, info->nombre, info->thread_num);
             despertar_siguiente();
         }
         else
         {
+            printf("[NODO %d][%s %d] -> nodo en espera\n", id, info->nombre, info->thread_num);
             nodo_activo = 0;
         }
     }
@@ -180,7 +209,10 @@ void *t1(void *args)
 // Hilo de tipo CONSULTAS
 void *t2(void *args)
 {
-    printf("[Nodo %d] -> proceso CONSULTAS creado\n", id);
+
+    struct thread_info *info = args;
+
+    printf("[NODO %d][%s %d] -> proceso creado\n", id, info->nombre, info->thread_num);
     while (1)
     {
         struct msg_nodo msg_cliente = (const struct msg_nodo){0};
@@ -414,38 +446,56 @@ int main(int argc, char *argv[])
     }
 
     // Creamos los hilos de tipo PAGOS
-    pthread_t hilo_t0[num_hilos[0]];
+    pthread_t hilo_t0[num_hilos[0] + num_hilos[1]];
     for (int i = 0; i < num_hilos[0]; i++)
     {
-        pthread_create(&hilo_t0[i], NULL, t0, NULL);
+        struct thread_info *info =  malloc(sizeof(struct thread_info));
+        info->thread_num = i;
+        info->tipo = PAGOS;
+        strcpy(info->nombre,"PAGOS");
+        pthread_create(&hilo_t0[i], NULL, t0, info);
     }
 
     // Creamos los hilos de tipo ANULACIONES
-    /*pthread_t hilo_t0[num_hilos[1]];
-    for (int i = 0; i < num_hilos[1]; i++)
+    for (int i = num_hilos[0]; i < (num_hilos[0] + num_hilos[1]); i++)
     {
-        pthread_create(&hilo_t0[i], NULL, t0, NULL);
-    }*/
+        struct thread_info *info =  malloc(sizeof(struct thread_info));
+        info->thread_num = i - num_hilos[0];
+        info->tipo = ANULACIONES;
+        strcpy(info->nombre,"ANULACIONES");
+        pthread_create(&hilo_t0[i], NULL, t0, info);
+    }
 
     // Creamos los hilos de tipo RESERVAS
-    pthread_t hilo_t1[num_hilos[2]];
+    pthread_t hilo_t1[num_hilos[2] + num_hilos[3]];
     for (int i = 0; i < num_hilos[2]; i++)
     {
-        pthread_create(&hilo_t1[i], NULL, t1, NULL);
+        struct thread_info *info =  malloc(sizeof(struct thread_info));
+        info->thread_num = i;
+        info->tipo = RESERVAS;
+        strcpy(info->nombre,"RESERVAS");
+        pthread_create(&hilo_t1[i], NULL, t1, info);
     }
 
     // Creamos los hilos de tipo ADMINISTRACION
-    /*pthread_t hilo_t1[num_hilos[3]];
-    for (int i = 0; i < num_hilos[3]; i++)
+    for (int i = num_hilos[2]; i <(num_hilos[2] + num_hilos[3]); i++)
     {
-        pthread_create(&hilo_t1[3], NULL, t1, NULL);
-    }*/
+        struct thread_info *info =  malloc(sizeof(struct thread_info));
+        info->thread_num = i - num_hilos[2];
+        info->tipo = ADMINISTRACION;
+        strcpy(info->nombre,"ADMINISTRACION");
+        pthread_create(&hilo_t1[3], NULL, t1, info);
+    }
 
     // Creamos los hilos de tipo CONSULTAS
     pthread_t hilo_t2[num_hilos[4]];
     for (int i = 0; i < num_hilos[4]; i++)
     {
-        pthread_create(&hilo_t2[4], NULL, t2, NULL);
+        struct thread_info *info =  malloc(sizeof(struct thread_info));
+        info->thread_num = i;
+        info->tipo = CONSULTAS;
+        strcpy(info->nombre,"CONSULTAS");
+        pthread_create(&hilo_t2[4], NULL, t2, info);
     }
 
     // Creamos el hilo que espera un mensaje para terminar el programa

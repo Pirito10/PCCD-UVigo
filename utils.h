@@ -25,6 +25,12 @@ struct msg_nodo
     int vector_atendidas[3][N];   // Vector atendidas
 };
 
+struct thread_info {
+    int tipo;
+    int thread_num;
+    char nombre[16];
+};
+
 // Estructura de los elementos de la lista enlazada de IDs
 struct NodoLista
 {
