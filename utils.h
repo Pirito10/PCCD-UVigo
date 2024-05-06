@@ -4,6 +4,7 @@
 
 #define TOKEN 1           // Mensajes de envío de testigo
 #define REQUEST 2         // Mensajes de solicitud de testigo
+#define KILL 3            // Mensajes de solicitud para terminar con el nodo
 #define PAGOS 11          // Mensajes de solicitud de pagos
 #define ANULACIONES 12    // Mensajes de solicitud de anulaciones
 #define RESERVAS 13       // Mensajes de solicitud de reservas
