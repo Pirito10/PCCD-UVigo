@@ -8,7 +8,7 @@
 // Estructura de los mensajes
 struct msg_nodo
 {
-    long mtype; // Tipo de mensaje, 11 -> pago, 12 -> anulacion, 13 -> reserva, 14 -> administracion, 15 -> consulta
+    long mtype;
 };
 
 int main(int argc, char *argv[])
@@ -57,7 +57,7 @@ int main(int argc, char *argv[])
 
         // Creamos el mensaje
         struct msg_nodo msg_nodo;
-        msg_nodo.mtype = tipo_solicitud + 10; // Ver la defición del struct
+        msg_nodo.mtype = tipo_solicitud + 10; // Tipo de mensaje, 11 -> pago, 12 -> anulacion, 13 -> reserva, 14 -> administracion, 15 -> consulta
 
         // Enviamos el mensaje
         if (msgsnd(msgid, &msg_nodo, sizeof(msg_nodo), 0) == -1)
