@@ -127,7 +127,7 @@ int prioridad_superior(int prioridad)
  * Añade un ID a la lista enlazada de IDs
  * @param id ID del nodo a añadir a la lista
  */
-void añadir_lista(int id)
+void anadir_lista(int id)
 {
     // Si la lista está vacía
     if (lista_vacia() == 1)
