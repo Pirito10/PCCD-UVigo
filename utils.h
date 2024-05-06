@@ -20,6 +20,8 @@ struct msg_nodo
     int id_nodo_origen;           // ID del nodo origen
     int num_peticion_nodo_origen; // Número de petición del nodo origen
     int prioridad_origen;         // Prioridad de la solicitud
+    int consulta;                 // Si 1 -> token de consulta
+    int devolucion;               // Si 1 -> es el retorno de un token de consulta
     int vector_atendidas[3][N];   // Vector atendidas
 };
 
