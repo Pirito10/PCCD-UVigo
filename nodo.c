@@ -256,6 +256,7 @@ void *t2(void *args)
                 actualizar_atendidas(msg_token.vector_atendidas);
                 if (msg_token.consulta)
                 {
+                    printf("[NODO %d][%s %d] -> token consulta recibido\n", id, info->nombre, info->thread_num);
                     token_consulta = 1;
                     token_consulta_origen = msg_token.id_nodo_origen;
                 }
@@ -267,8 +268,10 @@ void *t2(void *args)
             }
             if (quiere[0] > 0 || quiere[1] > 0)
             {
+                printf("[NODO %d][%s %d] -> proceso prioritario a la espera, dando paso\n", id, info->nombre, info->thread_num);
                 if (token_consulta)
                 {
+                    printf("[NODO %d][%s %d] -> devolviendo token consulta\n", id, info->nombre, info->thread_num);
                     token_consulta = 0;
                     devolver_token_consulta();
                 }
@@ -279,6 +282,7 @@ void *t2(void *args)
 
         if (primera_consulta)
         {
+            printf("[NODO %d][%s %d] -> primera consulta, obteniendo SC y dando paso a consultas\n", id, info->nombre, info->thread_num);
             primera_consulta = 0;
             sem_wait(&mutex_sc_sem);
             seccion_critica = 1;
@@ -290,23 +294,28 @@ void *t2(void *args)
         }
 
         consultas_sc++;
+        printf("[NODO %d][%s %d] -> seccion critica\n", id, info->nombre, info->thread_num);
         // SECCIÓN CRÍTICA
+        sleep(10);
         consultas_sc--;
 
         quiere[2]--;
-
+        printf("[NODO %d][%s %d] -> ha salido seccion critica\n", id, info->nombre, info->thread_num);
         if (quiere[2] == 0)
         {
+            printf("[NODO %d][%s %d] -> ultimo proceso ha salido, actualizando atendidas\n", id, info->nombre, info->thread_num);
             vector_atendidas[2][id] = vector_peticiones[2][id];
         }
         int nodo_siguiente = buscar_nodo_siguiente();
         if (nodo_siguiente >= 0 || quiere[0] || quiere[1])
         {
             paso_consultas = 0;
+            printf("[NODO %d][%s %d] -> proceso prioritario quiere, parando consultas\n", id, info->nombre, info->thread_num, nodo_siguiente);
             if (consultas_sc == 0)
             {
                 if (token_consulta)
                 {
+                    printf("[NODO %d][%s %d] -> ultima consulta, devolviendo token consulta\n", id, info->nombre, info->thread_num, nodo_siguiente);
                     token_consulta = 0;
                     devolver_token_consulta();
                 }
@@ -314,9 +323,11 @@ void *t2(void *args)
                 {
                     if (!lista_vacia())
                     {
+                        printf("[NODO %d][%s %d] -> ultima consulta, esperando devolucion\n", id, info->nombre, info->thread_num, nodo_siguiente);
                         sem_wait(&lista_vacia_sem);
                     }
                 }
+                printf("[NODO %d][%s %d] -> ultima consulta, saliendo de SC\n", id, info->nombre, info->thread_num, nodo_siguiente);
                 seccion_critica = 0;
                 sem_post(&mutex_sc_sem);
                 primera_consulta = 1;
@@ -324,6 +335,7 @@ void *t2(void *args)
                 nodo_siguiente = buscar_nodo_siguiente();
                 if (token && nodo_siguiente >= 0)
                 {
+                    printf("[NODO %d][%s %d] -> peticion prioritaria en nodo %d, enviando token\n", id, info->nombre, info->thread_num, nodo_siguiente);
                     token = 0;
                     enviar_token(nodo_siguiente);
                 }
@@ -333,10 +345,12 @@ void *t2(void *args)
                     {
                         hacer_peticiones();
                     }
+                    printf("[NODO %d][%s %d] -> despertando siguiente\n", id, info->nombre, info->thread_num);
                     despertar_siguiente();
                 }
                 else
                 {
+                    printf("[NODO %d][%s %d] -> nodo en espera\n", id, info->nombre, info->thread_num);
                     nodo_activo = 0;
                 }
             }
@@ -368,24 +382,29 @@ void receptor()
         msgrcv(cola_msg, &msg_peticion, sizeof(msg_peticion), REQUEST, 0);
         if (msg_peticion.devolucion)
         {
+            printf("[NODO %d][RECEPTOR] -> devolucion token consultas de nodo %d\n", id, msg_peticion.id_nodo_origen);
             quitar_lista(msg_peticion.id_nodo_origen);
             if (lista_vacia())
             {
+                printf("[NODO %d][RECEPTOR] -> lista vacia, despertando ultima consulta %d\n", id, msg_peticion.id_nodo_origen);
                 sem_post(&lista_vacia_sem);
             }
         }
         else
         {
+            printf("[NODO %d][RECEPTOR] -> peticion de nodo %d  prioridad %d\n", id, msg_peticion.id_nodo_origen, msg_peticion.prioridad_origen);
             // Actualizamos el vector de peticiones
             vector_peticiones[msg_peticion.prioridad_origen][msg_peticion.id_nodo_origen] = MAX(vector_peticiones[msg_peticion.prioridad_origen][msg_peticion.id_nodo_origen], msg_peticion.num_peticion_nodo_origen);
             // Pasamos el token si procede
             if (token && !seccion_critica && prioridad_superior(msg_peticion.prioridad_origen) && (vector_peticiones[msg_peticion.prioridad_origen][msg_peticion.id_nodo_origen] > vector_atendidas[msg_peticion.prioridad_origen][msg_peticion.id_nodo_origen]))
             {
+                printf("[NODO %d][RECEPTOR] -> enviando token a nodo %d\n", id, msg_peticion.id_nodo_origen);
                 token = 0;
                 enviar_token(msg_peticion.id_nodo_origen);
             }
             else if (paso_consultas && msg_peticion.prioridad_origen == 2 && (vector_peticiones[2][msg_peticion.id_nodo_origen] > vector_atendidas[2][msg_peticion.id_nodo_origen]))
             {
+                printf("[NODO %d][RECEPTOR] -> enviando token consultas a nodo %d\n", id, msg_peticion.id_nodo_origen);
                 enviar_token_consulta(msg_peticion.id_nodo_origen);
             }
         }
