@@ -270,30 +270,39 @@ int main(int argc, char *argv[])
         cola_msg = msgget(1000 + id, 0666 | IPC_CREAT);
     }
 
-    // Creamos los hilos de prioridad T0
+    // Creamos los hilos de tipo PAGOS
     pthread_t hilo_t0[num_hilos[0]];
     for (int i = 0; i < num_hilos[0]; i++)
     {
         pthread_create(&hilo_t0[i], NULL, t0, NULL);
     }
 
+    // Creamos los hilos de tipo ANULACIONES
     /*pthread_t hilo_t0[num_hilos[1]];
     for (int i = 0; i < num_hilos[1]; i++)
     {
         pthread_create(&hilo_t0[i], NULL, t0, NULL);
     }*/
 
-    // Creamos los hilos de prioridad T1
+    // Creamos los hilos de tipo RESERVAS
     pthread_t hilo_t1[num_hilos[2]];
     for (int i = 0; i < num_hilos[2]; i++)
     {
         pthread_create(&hilo_t1[i], NULL, t1, NULL);
     }
 
+    // Creamos los hilos de tipo ADMINISTRACION
     /*pthread_t hilo_t1[num_hilos[3]];
     for (int i = 0; i < num_hilos[3]; i++)
     {
         pthread_create(&hilo_t1[3], NULL, t1, NULL);
+    }*/
+
+    // Creamos los hilos de tipo CONSULTAS
+    /*pthread_t hilo_t2[num_hilos[4]];
+    for (int i = 0; i < num_hilos[4]; i++)
+    {
+        pthread_create(&hilo_t2[4], NULL, t2, NULL);
     }*/
 
     // Creamos el hilo que espera un mensaje para terminar el programa
