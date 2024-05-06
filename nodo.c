@@ -1,6 +1,7 @@
 // Sin esta línea se rompe mi entorno, se puede suprimir en la entrega final pero la necesito para debuggear -Manu
 #define _GNU_SOURCE
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
 #include <semaphore.h>
@@ -27,6 +28,7 @@ sem_t mutex_sc_sem; // Semáforo de exclusión mutua de SC
 
 void *t0(void *args)
 {
+    printf("[Nodo %d] -> proceso PAGOS creado\n", id);
     while (1)
     {
         struct msg_nodo msg_cliente = (const struct msg_nodo){0};
@@ -90,6 +92,7 @@ void *t0(void *args)
 
 void *t1(void *args)
 {
+    printf("[Nodo %d] -> proceso RESERVAS creado\n", id);
     while (1)
     {
         struct msg_nodo msg_cliente = (const struct msg_nodo){0};
@@ -184,6 +187,7 @@ void *kill_nodo()
     // Esperamos a recibir una solicitud para terminar con el nodo
     msgrcv(cola_msg, &msg_kill, sizeof(msg_kill), KILL, 0);
 
+    printf("\nSe ha recibido una señal para terminar con el nodo\n");
     // Matamos al nodo
     kill(getpid(), SIGTERM);
 
@@ -211,6 +215,38 @@ void receptor()
 
 int main(int argc, char *argv[])
 {
+    if (argc != 7)
+    {
+        printf("Uso: %s <ID> <procesos_pagos> <procesos_anulaciones> <procesos_reservas> <procesos_administracion> <procesos_consultas>\n", argv[0]);
+        return EXIT_FAILURE;
+    }
+
+    // Obtenemos el ID del nodo de los parámetros
+    id = atoi(argv[1]);
+    if (id < 0)
+    {
+        printf("El ID del nodo debe ser cero o superior\n");
+        return EXIT_FAILURE;
+    }
+
+    // Obtenemos el número de hilos para cada tipo de proceso de los parámetros
+    int num_hilos[5];
+    for (int i = 0; i < 5; i++)
+    {
+        num_hilos[i] = atoi(argv[2 + i]);
+        if (num_hilos[i] < 0)
+        {
+            printf("El número de procesos no puede ser negativo\n");
+            return EXIT_FAILURE;
+        }
+    }
+
+    // Damos el token al nodo con ID = 0
+    if (id == 0)
+    {
+        token = 1;
+    }
+
     // Inicializamos los arrays a cero
     for (int i = 0; i < 3; i++)
     {
@@ -221,13 +257,10 @@ int main(int argc, char *argv[])
         }
     }
 
-    id = atoi(argv[1]); // ID del nodo
-
-    // Damos el token al nodo con ID = 0
-    if (id == 0)
-    {
-        token = 1;
-    }
+    // Inicializamos los semáforos
+    sem_init(&token_solicitado_sem, 0, 0);
+    sem_init(&espera_t1_sem, 0, 0);
+    sem_init(&mutex_sc_sem, 0, 1);
 
     // Incializamos la cola de mensajes del nodo
     cola_msg = msgget(1000 + id, 0666 | IPC_CREAT);
@@ -237,24 +270,31 @@ int main(int argc, char *argv[])
         cola_msg = msgget(1000 + id, 0666 | IPC_CREAT);
     }
 
-    // Inicializamos los semáforos
-    sem_init(&token_solicitado_sem, 0, 0);
-    sem_init(&espera_t1_sem, 0, 0);
-    sem_init(&mutex_sc_sem, 0, 1);
-
     // Creamos los hilos de prioridad T0
-    pthread_t hilo_t0[3];
-    for (int i = 0; i < 3; i++)
+    pthread_t hilo_t0[num_hilos[0]];
+    for (int i = 0; i < num_hilos[0]; i++)
     {
         pthread_create(&hilo_t0[i], NULL, t0, NULL);
     }
 
+    /*pthread_t hilo_t0[num_hilos[1]];
+    for (int i = 0; i < num_hilos[1]; i++)
+    {
+        pthread_create(&hilo_t0[i], NULL, t0, NULL);
+    }*/
+
     // Creamos los hilos de prioridad T1
-    pthread_t hilo_t1[3];
-    for (int i = 0; i < 3; i++)
+    pthread_t hilo_t1[num_hilos[2]];
+    for (int i = 0; i < num_hilos[2]; i++)
     {
         pthread_create(&hilo_t1[i], NULL, t1, NULL);
     }
+
+    /*pthread_t hilo_t1[num_hilos[3]];
+    for (int i = 0; i < num_hilos[3]; i++)
+    {
+        pthread_create(&hilo_t1[3], NULL, t1, NULL);
+    }*/
 
     // Creamos el hilo que espera un mensaje para terminar el programa
     pthread_t hilo_kill;
