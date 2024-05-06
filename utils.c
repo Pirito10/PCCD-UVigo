@@ -1,12 +1,20 @@
 #include <stdlib.h>
 #include <sys/msg.h>
+#include <semaphore.h>
 
 #include "utils.h" // Archivo de cabecera con la definición de las funciones y estructura de los mensajes
 
 // Variables globales en nodo.c
 extern int id, quiere[3];                                   // ID del nodo y vector de procesos que quieren SC por cada prioridad
 extern int vector_peticiones[3][N], vector_atendidas[3][N]; // Cola de solicitudes por atender y cola de solicitudes atendidas
-struct NodoLista *nodo_cabeza = NULL;                       // Puntero que apunta al primer nodo de la lista
+
+extern int cola_t0, cola_t1, cola_t2;
+extern sem_t cola_t0_sem, cola_t1_sem, cola_t2_sem;
+
+extern int token_consulta_origen;
+extern int token_consulta;
+
+struct NodoLista *nodo_cabeza = NULL; // Puntero que apunta al primer nodo de la lista
 
 /**
  * Envía el token a otro nodo especificado
@@ -125,12 +133,74 @@ int prioridad_superior(int prioridad)
 
 int procesos_quieren()
 {
-    return 0;
+    return quiere[0] || quiere[1] || quiere[2];
 }
-void hacer_peticiones() {}
-void despertar_siguiente() {}
-void devolver_token_consulta() {}
-void enviar_token_consulta(int id_nodo) {}
+
+void hacer_peticiones()
+{
+    for (int i = 0; i < 3; i++)
+    {
+        if (quiere[i] && vector_atendidas[i][id] >= vector_peticiones[i][id])
+        {
+            broadcast(i);
+        }
+    }
+}
+
+void despertar_siguiente()
+{
+    if (cola_t0)
+    {
+        cola_t0--;
+        sem_post(&cola_t0_sem);
+    }
+    else if (cola_t1)
+    {
+        cola_t1--;
+        sem_post(&cola_t1_sem);
+    }
+    else if (cola_t2)
+    {
+        cola_t2--;
+        sem_post(&cola_t2_sem);
+    }
+}
+
+void devolver_token_consulta()
+{
+    // Creamos el mensaje
+    struct msg_nodo msg_nodo = (const struct msg_nodo){0};
+    msg_nodo.mtype = REQUEST;
+    msg_nodo.id_nodo_origen = id;
+    msg_nodo.devolucion = 1;
+
+    // Enviamos el mensaje con el testigo consulta
+    int msgid = msgget(1000 + token_consulta_origen, 0666);
+    msgsnd(msgid, &msg_nodo, sizeof(msg_nodo), 0);
+}
+
+void enviar_token_consulta(int id_nodo)
+{
+    // Creamos el mensaje
+    struct msg_nodo msg_nodo = (const struct msg_nodo){0};
+    msg_nodo.mtype = TOKEN;
+    msg_nodo.id_nodo_origen = id;
+    msg_nodo.consulta = 1;
+
+    for (int j = 0; j < 3; j++)
+    {
+        for (int i = 0; i < N; i++)
+        {
+            // Introducimos el vector de atendidas en el mensaje
+            msg_nodo.vector_atendidas[j][i] = vector_atendidas[j][i];
+        }
+    }
+    // Anotamos nodo
+    anadir_lista(id_nodo);
+    // Enviamos el mensaje con el testigo consulta
+    int msgid = msgget(1000 + id_nodo, 0666);
+    msgsnd(msgid, &msg_nodo, sizeof(msg_nodo), 0);
+}
 
 /**
  * Añade un ID a la lista enlazada de IDs

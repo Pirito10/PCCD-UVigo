@@ -231,6 +231,7 @@ void *t2(void *args)
             {
                 if (token_consulta)
                 {
+                    token_consulta = 0;
                     devolver_token_consulta();
                 }
                 proceso_despertado = 1;
