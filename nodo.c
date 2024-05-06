@@ -10,19 +10,22 @@
 
 #include "utils.h" // Archivo de cabecera con la definición de las funciones y estructura de los mensajes
 
-int token, id, seccion_critica; // Testigo, ID del nodo y estado de la SC
-int vector_peticiones[3][N];    // Cola de solicitudes por atender
-int vector_atendidas[3][N];     // Cola de solicitudes atendidas
-int cola_msg = 0;               // Cola de mensajes del nodo
-int primero_t1 = 1;             // Está a 0 cuando los procesos T1 ya se han empezado a dar paso unos a otros
+int token, token_consulta, id, seccion_critica = 0; // Testigo, testigo consulta, ID del nodo y estado de la SC
+int vector_peticiones[3][N];                        // Cola de solicitudes por atender
+int vector_atendidas[3][N];                         // Cola de solicitudes atendidas
+int cola_msg = 0;                                   // Cola de mensajes del nodo
+int nodo_activo = 0;                                // A 1 cuando al menos un proceso no está a la espera de peticion de un cliente
+int paso_consultas = 0;                             // A 1 cuando las consultas pueden entrar en SC
+int primera_consulta = 1;                           // A 1 cuando no hay ninguna consulta en SC ni tokens de consulta distribuidos
+int token_consulta_origen = -1;                     // ID del nodo del que se ha recibido el token consulta
+int consultas_sc = 0;                               // Contador de numero de consultas en SC
+
+int cola_t0, cola_t1, cola_t2 = 0; // Contadores para los procesos a la espera de cada prioridad
+sem_t cola_t0_sem, cola_t1_sem, cola_t2_sem;
+
+sem_t lista_vacia_sem; // Semaforo para la sync entre el ultipo lector y el receptor
 
 int quiere[3] = {0, 0, 0}; // Vector de procesos que quieren SC por cada prioridad
-
-int espera_token = 0;       // Número de procesos a la espera de token
-sem_t token_solicitado_sem; // Semáforo de paso para procesos en espera de token
-
-int espera_t1;       // Número de procesos de T1 que están a la espera
-sem_t espera_t1_sem; // Semáforo de paso para procesos T1 en espera por prioridad superior o en cola de SC
 
 sem_t mutex_sc_sem; // Semáforo de exclusión mutua de SC
 
@@ -38,32 +41,28 @@ void *t0(void *args)
 
         quiere[0]++;
 
+        if ((!token || !lista_vacia()) && !peticion_activa(0))
+        {
+            broadcast(0);
+        }
+
+        if (nodo_activo)
+        {
+            cola_t0++;
+            sem_wait(&cola_t0_sem);
+        }
+        else
+        {
+            nodo_activo = 1;
+        }
+
         if (!token)
         {
-            if (!peticion_activa(0))
-            {
-                broadcast(0);
-            }
-            if (espera_token)
-            {
-                espera_token++;
-                sem_wait(&token_solicitado_sem);
-            }
-            else
-            {
-                espera_token++;
-                struct msg_nodo msg_token = (const struct msg_nodo){0};
-                // Recibir token
-                msgrcv(cola_msg, &msg_token, sizeof(msg_token), TOKEN, 0);
-                actualizar_atendidas(msg_token.vector_atendidas);
-                token = 1;
-                // Despertar a los procesos que esperaban el token
-                for (int i = 1; i < espera_token; i++)
-                {
-                    sem_post(&token_solicitado_sem);
-                }
-                espera_token = 0;
-            }
+            struct msg_nodo msg_token = (const struct msg_nodo){0};
+            // Recibir token
+            msgrcv(cola_msg, &msg_token, sizeof(msg_token), TOKEN, 0);
+            actualizar_atendidas(msg_token.vector_atendidas);
+            token = 1;
         }
 
         sem_wait(&mutex_sc_sem);
@@ -73,20 +72,28 @@ void *t0(void *args)
         sem_post(&mutex_sc_sem);
 
         quiere[0]--;
+
         if (quiere[0] == 0)
         {
             vector_atendidas[0][id] = vector_peticiones[0][id];
-            int nodo_siguiente = buscar_nodo_siguiente();
+        }
+        int nodo_siguiente = buscar_nodo_siguiente();
+        if (nodo_siguiente > 0)
+        {
+            token = 0;
+            enviar_token(nodo_siguiente);
+        }
+        if (procesos_quieren())
+        {
             if (nodo_siguiente > 0)
             {
-                token = 0;
-                enviar_token(nodo_siguiente);
+                hacer_peticiones();
             }
-            else if (espera_t1 > 0)
-            {
-                espera_t1--;
-                sem_post(&espera_t1_sem);
-            }
+            despertar_siguiente();
+        }
+        else
+        {
+            nodo_activo = 0;
         }
     }
 }
@@ -103,52 +110,39 @@ void *t1(void *args)
 
         quiere[1]++;
 
-        while (1)
+        int proceso_despertado;
+        do
         {
-            if (!token)
+            proceso_despertado = 0;
+            if ((!token || !lista_vacia()) && !peticion_activa(1))
             {
-                if (!peticion_activa(1))
-                {
-                    broadcast(1);
-                }
-                if (espera_token)
-                {
-                    espera_token++;
-                    sem_wait(&token_solicitado_sem);
-                }
-                else
-                {
-                    espera_token++;
-                    struct msg_nodo msg_token = (const struct msg_nodo){0};
-                    // Recibir token
-                    msgrcv(cola_msg, &msg_token, sizeof(msg_token), TOKEN, 0);
-                    actualizar_atendidas(msg_token.vector_atendidas);
-                    token = 1;
-                    // Despertar a los procesos que esperaban el token
-                    for (int i = 1; i < espera_token; i++)
-                    {
-                        sem_post(&token_solicitado_sem);
-                    }
-                    espera_token = 0;
-                }
+                broadcast(1);
             }
 
-            // Los procesos T1 se suspenden aquí
-            if (quiere[0] || !primero_t1)
+            if (nodo_activo)
             {
-                espera_t1++;
-                sem_wait(&espera_t1_sem);
+                cola_t1++;
+                sem_wait(&cola_t1_sem);
             }
-            // Si se tiene el token al ser despertado se pasa a obtener SC sinó se repite el proceso de intentar obtenerla
-            if (token)
+            else
             {
-                if (primero_t1)
-                {
-                    primero_t1 = 0;
-                }
-                break;
+                nodo_activo = 1;
             }
-        }
+
+            if (!token)
+            {
+                struct msg_nodo msg_token = (const struct msg_nodo){0};
+                // Recibir token
+                msgrcv(cola_msg, &msg_token, sizeof(msg_token), TOKEN, 0);
+                actualizar_atendidas(msg_token.vector_atendidas);
+                token = 1;
+            }
+            if (quiere[0] > 0)
+            {
+                proceso_despertado = 1;
+                despertar_siguiente();
+            }
+        } while (proceso_despertado);
 
         sem_wait(&mutex_sc_sem);
         seccion_critica = 1;
@@ -157,28 +151,157 @@ void *t1(void *args)
         sem_post(&mutex_sc_sem);
 
         quiere[1]--;
+
         if (quiere[1] == 0)
         {
-            primero_t1 = 1;
             vector_atendidas[1][id] = vector_peticiones[1][id];
         }
         int nodo_siguiente = buscar_nodo_siguiente();
         if (nodo_siguiente > 0)
         {
             token = 0;
-            primero_t1 = 1;
             enviar_token(nodo_siguiente);
-            // Despertar a todos los T1 que esperaban en cola o a proceso prioritario para que esperen token
-            for (int i = 0; i < espera_t1; i++)
-            {
-                sem_post(&espera_t1_sem);
-            }
-            espera_t1 = 0;
         }
-        else if (!quiere[0])
+        if (procesos_quieren())
         {
-            espera_t1--;
-            sem_post(&espera_t1_sem);
+            if (nodo_siguiente > 0)
+            {
+                hacer_peticiones();
+            }
+            despertar_siguiente();
+        }
+        else
+        {
+            nodo_activo = 0;
+        }
+    }
+}
+
+// Hilo de tipo CONSULTAS
+void *t2(void *args)
+{
+    printf("[Nodo %d] -> proceso CONSULTAS creado\n", id);
+    while (1)
+    {
+        struct msg_nodo msg_cliente = (const struct msg_nodo){0};
+        // Recibir peticion cliente
+        msgrcv(cola_msg, &msg_cliente, sizeof(msg_cliente), CONSULTAS, 0);
+
+        quiere[2]++;
+
+        int proceso_despertado;
+        do
+        {
+            proceso_despertado = 0;
+            if ((!(token || token_consulta)) && !peticion_activa(2))
+            {
+                broadcast(2);
+            }
+
+            if (nodo_activo)
+            {
+                if (!paso_consultas)
+                {
+                    cola_t2++;
+                    sem_wait(&cola_t2_sem);
+                }
+            }
+            else
+            {
+                nodo_activo = 1;
+            }
+
+            if (!(token || token_consulta))
+            {
+                struct msg_nodo msg_token = (const struct msg_nodo){0};
+                // Recibir token
+                msgrcv(cola_msg, &msg_token, sizeof(msg_token), TOKEN, 0);
+                actualizar_atendidas(msg_token.vector_atendidas);
+                if (msg_token.consulta)
+                {
+                    token_consulta = 1;
+                    token_consulta_origen = msg_token.id_nodo_origen;
+                }
+                else
+                {
+                    token = 1;
+                }
+            }
+            if (quiere[0] > 0 || quiere[1] > 0)
+            {
+                if (token_consulta)
+                {
+                    token_consulta = 0;
+                    devolver_token_consulta();
+                }
+                proceso_despertado = 1;
+                despertar_siguiente();
+            }
+        } while (proceso_despertado);
+
+        if (primera_consulta)
+        {
+            primera_consulta = 0;
+            sem_wait(&mutex_sc_sem);
+            seccion_critica = 1;
+            paso_consultas = 1;
+            for (int i = 0; i < cola_t2; i++)
+            {
+                sem_post(&cola_t2_sem);
+            }
+        }
+
+        consultas_sc++;
+        // SECCIÓN CRÍTICA
+        consultas_sc--;
+
+        quiere[2]--;
+
+        if (quiere[2] == 0)
+        {
+            vector_atendidas[2][id] = vector_peticiones[2][id];
+        }
+        int nodo_siguiente = buscar_nodo_siguiente();
+        if (nodo_siguiente > 0 || quiere[0] || quiere[1])
+        {
+            paso_consultas = 0;
+            if (consultas_sc == 0)
+            {
+                if (token_consulta)
+                {
+                    token_consulta = 0;
+                    devolver_token_consulta();
+                }
+                else
+                {
+                    if (!lista_vacia())
+                    {
+                        sem_wait(&lista_vacia_sem);
+                    }
+                }
+                seccion_critica = 0;
+                sem_post(&mutex_sc_sem);
+                primera_consulta = 1;
+
+                nodo_siguiente = buscar_nodo_siguiente();
+                if (token && nodo_siguiente > 0)
+                {
+                    token = 0;
+                    enviar_token(nodo_siguiente);
+                }
+                if (procesos_quieren())
+                {
+                    if (nodo_siguiente > 0)
+                    {
+                        hacer_peticiones();
+                    }
+                    despertar_siguiente();
+                }
+                else
+                {
+                    nodo_activo = 0;
+                }
+            }
         }
     }
 }
@@ -205,13 +328,28 @@ void receptor()
         struct msg_nodo msg_peticion = (const struct msg_nodo){0};
         // Esperamos a recibir una solicitud de token
         msgrcv(cola_msg, &msg_peticion, sizeof(msg_peticion), REQUEST, 0);
-        // Actualizamos el vector de peticiones
-        vector_peticiones[msg_peticion.prioridad_origen][msg_peticion.id_nodo_origen] = MAX(vector_peticiones[msg_peticion.prioridad_origen][msg_peticion.id_nodo_origen], msg_peticion.num_peticion_nodo_origen);
-        // Pasamos el token si procede
-        if (token && !seccion_critica && prioridad_superior(msg_peticion.prioridad_origen) && (vector_peticiones[msg_peticion.prioridad_origen][msg_peticion.id_nodo_origen] > vector_atendidas[msg_peticion.prioridad_origen][msg_peticion.id_nodo_origen]))
+        if (msg_peticion.devolucion)
         {
-            token = 0;
-            enviar_token(msg_peticion.id_nodo_origen);
+            quitar_lista(msg_peticion.id_nodo_origen);
+            if (lista_vacia())
+            {
+                sem_post(&lista_vacia_sem);
+            }
+        }
+        else
+        {
+            // Actualizamos el vector de peticiones
+            vector_peticiones[msg_peticion.prioridad_origen][msg_peticion.id_nodo_origen] = MAX(vector_peticiones[msg_peticion.prioridad_origen][msg_peticion.id_nodo_origen], msg_peticion.num_peticion_nodo_origen);
+            // Pasamos el token si procede
+            if (token && !seccion_critica && prioridad_superior(msg_peticion.prioridad_origen) && (vector_peticiones[msg_peticion.prioridad_origen][msg_peticion.id_nodo_origen] > vector_atendidas[msg_peticion.prioridad_origen][msg_peticion.id_nodo_origen]))
+            {
+                token = 0;
+                enviar_token(msg_peticion.id_nodo_origen);
+            }
+            else if (paso_consultas && msg_peticion.prioridad_origen == 2 && (vector_peticiones[2][msg_peticion.id_nodo_origen] > vector_atendidas[2][msg_peticion.id_nodo_origen]))
+            {
+                enviar_token_consulta(msg_peticion.id_nodo_origen);
+            }
         }
     }
 }
@@ -261,9 +399,11 @@ int main(int argc, char *argv[])
     }
 
     // Inicializamos los semáforos
-    sem_init(&token_solicitado_sem, 0, 0);
-    sem_init(&espera_t1_sem, 0, 0);
     sem_init(&mutex_sc_sem, 0, 1);
+    sem_init(&cola_t0_sem, 0, 0);
+    sem_init(&cola_t1_sem, 0, 0);
+    sem_init(&cola_t2_sem, 0, 0);
+    sem_init(&lista_vacia_sem, 0, 0);
 
     // Incializamos la cola de mensajes del nodo
     cola_msg = msgget(1000 + id, 0666 | IPC_CREAT);
@@ -302,11 +442,11 @@ int main(int argc, char *argv[])
     }*/
 
     // Creamos los hilos de tipo CONSULTAS
-    /*pthread_t hilo_t2[num_hilos[4]];
+    pthread_t hilo_t2[num_hilos[4]];
     for (int i = 0; i < num_hilos[4]; i++)
     {
         pthread_create(&hilo_t2[4], NULL, t2, NULL);
-    }*/
+    }
 
     // Creamos el hilo que espera un mensaje para terminar el programa
     pthread_t hilo_kill;
