@@ -273,7 +273,7 @@ void *t2(void *args)
                 }
                 else
                 {
-                    if (!lista_vacia)
+                    if (!lista_vacia())
                     {
                         sem_wait(&lista_vacia_sem);
                     }
@@ -327,12 +327,16 @@ void receptor()
         struct msg_nodo msg_peticion = (const struct msg_nodo){0};
         // Esperamos a recibir una solicitud de token
         msgrcv(cola_msg, &msg_peticion, sizeof(msg_peticion), REQUEST, 0);
-        if(msg_peticion.devolucion) {
+        if (msg_peticion.devolucion)
+        {
             quitar_lista(msg_peticion.id_nodo_origen);
-            if (lista_vacia()) {
+            if (lista_vacia())
+            {
                 sem_post(&lista_vacia_sem);
             }
-        } else {
+        }
+        else
+        {
             // Actualizamos el vector de peticiones
             vector_peticiones[msg_peticion.prioridad_origen][msg_peticion.id_nodo_origen] = MAX(vector_peticiones[msg_peticion.prioridad_origen][msg_peticion.id_nodo_origen], msg_peticion.num_peticion_nodo_origen);
             // Pasamos el token si procede
@@ -340,11 +344,12 @@ void receptor()
             {
                 token = 0;
                 enviar_token(msg_peticion.id_nodo_origen);
-            } else if (paso_consultas && msg_peticion.prioridad_origen == 2 && (vector_peticiones[2][msg_peticion.id_nodo_origen] > vector_atendidas[2][msg_peticion.id_nodo_origen])) {
+            }
+            else if (paso_consultas && msg_peticion.prioridad_origen == 2 && (vector_peticiones[2][msg_peticion.id_nodo_origen] > vector_atendidas[2][msg_peticion.id_nodo_origen]))
+            {
                 enviar_token_consulta(msg_peticion.id_nodo_origen);
             }
         }
-
     }
 }
 
