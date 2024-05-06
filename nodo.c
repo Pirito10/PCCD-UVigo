@@ -26,6 +26,7 @@ sem_t espera_t1_sem; // Semáforo de paso para procesos T1 en espera por priorid
 
 sem_t mutex_sc_sem; // Semáforo de exclusión mutua de SC
 
+// Hilo de tipo PAGOS
 void *t0(void *args)
 {
     printf("[Nodo %d] -> proceso PAGOS creado\n", id);
@@ -90,6 +91,7 @@ void *t0(void *args)
     }
 }
 
+// Hilo de tipo RESERVAS
 void *t1(void *args)
 {
     printf("[Nodo %d] -> proceso RESERVAS creado\n", id);
@@ -181,6 +183,7 @@ void *t1(void *args)
     }
 }
 
+// Hilo receptor de un mensaje especial para terminar con el nodo
 void *kill_nodo()
 {
     struct msg_nodo msg_kill = (const struct msg_nodo){0};
