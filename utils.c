@@ -123,6 +123,15 @@ int prioridad_superior(int prioridad)
     return 1;
 }
 
+int procesos_quieren()
+{
+    return 0;
+}
+void hacer_peticiones() {}
+void despertar_siguiente() {}
+void devolver_token_consulta() {}
+void enviar_token_consulta(int id_nodo) {}
+
 /**
  * Añade un ID a la lista enlazada de IDs
  * @param id ID del nodo a añadir a la lista
