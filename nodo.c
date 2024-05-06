@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <semaphore.h>
+#include <signal.h>
 #include <sys/msg.h>
 
 #include "utils.h" // Archivo de cabecera con la definición de las funciones y estructura de los mensajes
@@ -177,6 +178,18 @@ void *t1(void *args)
     }
 }
 
+void *kill_nodo()
+{
+    struct msg_nodo msg_kill = (const struct msg_nodo){0};
+    // Esperamos a recibir una solicitud para terminar con el nodo
+    msgrcv(cola_msg, &msg_kill, sizeof(msg_kill), KILL, 0);
+
+    // Matamos al nodo
+    kill(getpid(), SIGTERM);
+
+    return 0;
+}
+
 // Función receptora de mensajes de otros nodos
 void receptor()
 {
@@ -242,6 +255,10 @@ int main(int argc, char *argv[])
     {
         pthread_create(&hilo_t1[i], NULL, t1, NULL);
     }
+
+    // Creamos el hilo que espera un mensaje para terminar el programa
+    pthread_t hilo_kill;
+    pthread_create(&hilo_kill, NULL, kill_nodo, NULL);
 
     // Ejecutamos el receptor de mensajes (bucle infinito)
     receptor();
