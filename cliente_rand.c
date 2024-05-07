@@ -84,7 +84,30 @@ int main(int argc, char *argv[])
             continue;
         }
 
-        printf("Solicitud de tipo %d enviada al nodo %d\n", tipo_solicitud, ID);
+        char *solicitud;
+
+        switch (tipo_solicitud)
+        {
+        case 1:
+            solicitud = "PAGO";
+            break;
+        case 2:
+            solicitud = "ANULACION";
+            break;
+        case 3:
+            solicitud = "RESERVA";
+            break;
+        case 4:
+            solicitud = "ADMIN";
+            break;
+        case 5:
+            solicitud = "CONSULTA";
+            break;
+        default:
+            break;
+        }
+
+        printf("Solicitud de tipo %s enviada al nodo %d\n", solicitud, ID);
 
         // Generamos un tiempo de espera aleatorio, entre 0 y max_espera
         int espera = (rand() % (max_espera + 1));
