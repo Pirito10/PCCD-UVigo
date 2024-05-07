@@ -22,6 +22,7 @@ int paso_consultas = 0;                             // A 1 cuando las consultas 
 int primera_consulta = 1;                           // A 1 cuando no hay ninguna consulta en SC ni tokens de consulta distribuidos
 int token_consulta_origen = -1;                     // ID del nodo del que se ha recibido el token consulta
 int consultas_sc = 0;                               // Contador de numero de consultas en SC
+int adelantamientos = 0;                            // Contador de adelantamientos de reservas a consultas
 
 int cola_t0, cola_t1, cola_t2 = 0; // Contadores para los procesos a la espera de cada prioridad
 sem_t cola_t0_sem, cola_t1_sem, cola_t2_sem;
@@ -109,6 +110,7 @@ void *t0(void *args)
             struct msg_nodo msg_token = (const struct msg_nodo){0};
             // Recibir token
             msgrcv(cola_msg, &msg_token, sizeof(msg_token), TOKEN, 0);
+            adelantamientos = msg_token.adelantamientos;
             actualizar_atendidas(msg_token.vector_atendidas);
             while (msg_token.consulta)
             {
@@ -253,6 +255,7 @@ void *t1(void *args)
                 struct msg_nodo msg_token = (const struct msg_nodo){0};
                 // Recibir token
                 msgrcv(cola_msg, &msg_token, sizeof(msg_token), TOKEN, 0);
+                adelantamientos = msg_token.adelantamientos;
                 actualizar_atendidas(msg_token.vector_atendidas);
                 while (msg_token.consulta)
                 {
@@ -283,6 +286,9 @@ void *t1(void *args)
                 sem_post(&mutex_quiere);
             }
         } while (proceso_despertado);
+        if (info->tipo == RESERVAS && (quiere[2] > 0 || buscar_consulta_siguiente() != -1)) {
+            adelantamientos++;
+        }
 
         sem_wait(&mutex_sc_sem);
         seccion_critica = 1;
@@ -307,7 +313,12 @@ void *t1(void *args)
         } else {
             sem_post(&mutex_quiere);
         }
-        int nodo_siguiente = buscar_nodo_siguiente(3);
+        int nodo_siguiente;
+        if (adelantamientos >= MAX_ADELANTAMIENTOS) {
+            nodo_siguiente = buscar_consulta_siguiente();
+        } else {
+            nodo_siguiente = buscar_nodo_siguiente();
+        }
         if (nodo_siguiente >= 0)
         {
             printf("[NODO %d][%s %d] -> peticion prioritaria en nodo %d, enviando token\n", id, info->nombre, info->thread_num, nodo_siguiente);
@@ -323,7 +334,11 @@ void *t1(void *args)
                 hacer_peticiones();
             }
             printf("[NODO %d][%s %d] -> despertando siguiente\n", id, info->nombre, info->thread_num);
-            despertar_siguiente();
+            if (adelantamientos >= MAX_ADELANTAMIENTOS) {
+                despertar_consulta_siguiente();
+            } else {
+                despertar_siguiente();
+            }
         }
         else
         {
@@ -398,6 +413,7 @@ void *t2(void *args)
                 struct msg_nodo msg_token = (const struct msg_nodo){0};
                 // Recibir token
                 msgrcv(cola_msg, &msg_token, sizeof(msg_token), TOKEN, 0);
+                adelantamientos = msg_token.adelantamientos;
                 actualizar_atendidas(msg_token.vector_atendidas);
                 if (msg_token.consulta)
                 {
@@ -482,6 +498,7 @@ void *t2(void *args)
         sem_wait(&mutex_consultas_sc);
         consultas_sc++;
         sem_post(&mutex_consultas_sc);
+        adelantamientos = 0;
         printf("[NODO %d][%s %d] -> seccion critica\n", id, info->nombre, info->thread_num);
         // SECCIÓN CRÍTICA
         sleep(TIEMPO_SC);

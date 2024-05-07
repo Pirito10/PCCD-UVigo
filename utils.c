@@ -5,7 +5,7 @@
 #include "utils.h" // Archivo de cabecera con la definición de las funciones y estructura de los mensajes
 
 // Variables globales en nodo.c
-extern int id, quiere[3];                                   // ID del nodo y vector de procesos que quieren SC por cada prioridad
+extern int id, adelantamientos, quiere[3];                                   // ID del nodo y vector de procesos que quieren SC por cada prioridad
 extern int vector_peticiones[3][N], vector_atendidas[3][N]; // Cola de solicitudes por atender y cola de solicitudes atendidas
 
 extern int cola_t0, cola_t1, cola_t2;
@@ -28,6 +28,7 @@ void enviar_token(int id_nodo)
     struct msg_nodo msg_nodo = (const struct msg_nodo){0};
     msg_nodo.mtype = TOKEN;
     msg_nodo.id_nodo_origen = id;
+    msg_nodo.adelantamientos = adelantamientos;
     for (int j = 0; j < 3; j++)
     {
         for (int i = 0; i < N; i++)
@@ -100,6 +101,18 @@ int buscar_nodo_siguiente(int cutoff)
     return -1;
 }
 
+int buscar_consulta_siguiente()
+{
+    for (int j = (id + 1) % N; j != id; j = (j + 1) % N)
+    {
+        if (vector_peticiones[2][j] > vector_atendidas[2][j])
+        {
+            return j;
+        }
+    }
+    return -1; //No debería ocurrir cuando vencen los adelantamientos
+}
+
 /**
  * Comprueba si hay una petición activa para la prioridad dada en el nodo
  * @param prioridad prioridad de la petición
@@ -160,6 +173,15 @@ void despertar_siguiente()
     }
 }
 
+void despertar_consulta_siguiente()
+{
+    if (cola_t2)
+    {
+        cola_t2--;
+        sem_post(&cola_t2_sem);
+    }
+}
+
 void devolver_token_consulta()
 {
     // Creamos el mensaje
@@ -187,6 +209,7 @@ void enviar_token_consulta(int id_nodo)
     struct msg_nodo msg_nodo = (const struct msg_nodo){0};
     msg_nodo.mtype = TOKEN;
     msg_nodo.id_nodo_origen = id;
+    msg_nodo.adelantamientos = 0;
     msg_nodo.consulta = 1;
 
     for (int j = 0; j < 3; j++)

@@ -1,6 +1,8 @@
 #ifndef UTILS_H
 
 #define N 3 // Número de nodos
+#define MAX_ADELANTAMIENTOS 10 //Número máximo de adelantamientos de reservas a consultas
+
 
 #define TOKEN 1           // Mensajes de envío de testigo
 #define REQUEST 2         // Mensajes de solicitud de testigo
@@ -24,6 +26,7 @@ struct msg_nodo
     int consulta;                 // Si 1 -> token de consulta
     int devolucion;               // Si 1 -> es el retorno de un token de consulta
     int vector_atendidas[3][N];   // Vector atendidas
+    int adelantamientos;          // Número de adelantamientos de reservas a consultas
 };
 
 struct thread_info {
@@ -44,12 +47,14 @@ void enviar_token(int id_nodo);
 void broadcast(int prioridad);
 void actualizar_atendidas(int vector_atendidas_nuevo[3][N]);
 int buscar_nodo_siguiente();
+int buscar_consulta_siguiente();
 int peticion_activa(int prioridad);
 int prioridad_superior(int prioridad);
 
 int procesos_quieren();
 void hacer_peticiones();
 void despertar_siguiente();
+void despertar_consulta_siguiente();
 void devolver_token_consulta();
 void enviar_token_consulta(int id_nodo);
 
