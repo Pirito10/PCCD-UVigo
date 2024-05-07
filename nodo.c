@@ -348,7 +348,7 @@ void *t2(void *args)
                     printf("[NODO %d][%s %d] -> token recibido\n", id, info->nombre, info->thread_num);
                     sem_wait(&mutex_token);
                     token = 1;
-                    sem_signal(&mutex_token);
+                    sem_post(&mutex_token);
                 }
             } else {
                 sem_wait(&mutex_token);
@@ -440,9 +440,9 @@ void *t2(void *args)
         if (nodo_siguiente >= 0 || quiere[0] || quiere[1])
         {
             sem_post(&mutex_quiere);
-            sem_wait(&paso_consultas);
+            sem_wait(&mutex_paso_consultas);
             paso_consultas = 0;
-            sem_post(&paso_consultas);
+            sem_post(&mutex_paso_consultas);
             printf("[NODO %d][%s %d] -> proceso prioritario quiere, parando consultas\n", id, info->nombre, info->thread_num);
             sem_wait(&mutex_consultas_sc);
             if (consultas_sc == 0)
