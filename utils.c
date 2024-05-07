@@ -85,23 +85,15 @@ void actualizar_atendidas(int vector_atendidas_nuevo[3][N])
  *
  * @return ID del nodo con la petición prioritaria, o -1 en caso de no existir
  */
-int buscar_nodo_siguiente()
+int buscar_nodo_siguiente(int cutoff)
 {
-    int prioridad_este_nodo = 3;
-    for (int i = 0; i < 3; i++)
-    {
-        if (quiere[i] > 0)
-        {
-            prioridad_este_nodo = i;
-        }
-    }
-    for (int i = 0; i < prioridad_este_nodo; i++)
+    for (int i = 0; i < cutoff; i++)
     {
         for (int j = (id + 1) % N; j != id; j = (j + 1) % N)
         {
             if (vector_peticiones[i][j] > vector_atendidas[i][j])
             {
-                return j;
+                return quiere[i] ? -1 : j;
             }
         }
     }

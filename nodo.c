@@ -9,6 +9,8 @@
 #include <sys/msg.h>
 #include <string.h>
 
+#define TIEMPO_SC 1
+
 #include "utils.h" // Archivo de cabecera con la definición de las funciones y estructura de los mensajes
 
 int token, token_consulta, id, seccion_critica = 0; // Testigo, testigo consulta, ID del nodo y estado de la SC
@@ -55,10 +57,31 @@ void *t0(void *args)
         sem_wait(&mutex_token);
         if ((!token || !lista_vacia()) && !peticion_activa(0))
         {
+            sem_post(&mutex_token);
             printf("[NODO %d][%s %d] -> solicitando token\n", id, info->nombre, info->thread_num);
             broadcast(0);
+            sem_wait(&mutex_nodo_activo);
+            if(!nodo_activo && token_consulta) {
+                sem_post(&mutex_nodo_activo);
+                sem_wait(&mutex_paso_consultas);
+                paso_consultas = 0;
+                sem_post(&mutex_paso_consultas);
+                sem_wait(&mutex_paso_consultas);
+                token_consulta = 0;
+                sem_post(&mutex_paso_consultas);
+                devolver_token_consulta();
+                printf("[NODO %d][%s %d] -> devolviendo token consulta a %d\n", id,info->nombre, info->thread_num, token_consulta_origen);
+                seccion_critica = 0;
+                sem_post(&mutex_sc_sem);
+                sem_wait(&mutex_primera_consulta);
+                primera_consulta = 1;
+                sem_post(&mutex_primera_consulta);
+            } else {
+                sem_post(&mutex_nodo_activo);
+            }
+        } else {
+            sem_post(&mutex_token);
         }
-        sem_post(&mutex_token);
 
         sem_wait(&mutex_nodo_activo);
         if (nodo_activo)
@@ -99,7 +122,7 @@ void *t0(void *args)
         seccion_critica = 1;
         printf("[NODO %d][%s %d] -> seccion critica\n", id, info->nombre, info->thread_num);
         // SECCIÓN CRÍTICA
-        sleep(10);
+        sleep(TIEMPO_SC);
         seccion_critica = 0;
         sem_post(&mutex_sc_sem);
 
@@ -118,7 +141,7 @@ void *t0(void *args)
         } else {
             sem_post(&mutex_quiere);
         }
-        int nodo_siguiente = buscar_nodo_siguiente();
+        int nodo_siguiente = buscar_nodo_siguiente(3);
         if (nodo_siguiente >= 0)
         {
             printf("[NODO %d][%s %d] -> peticion prioritaria en nodo %d, enviando token\n", id, info->nombre, info->thread_num, nodo_siguiente);
@@ -171,6 +194,25 @@ void *t1(void *args)
             {
                 printf("[NODO %d][%s %d] -> solicitando token\n", id, info->nombre, info->thread_num);
                 broadcast(1);
+                sem_wait(&mutex_nodo_activo);
+                if(!nodo_activo && token_consulta) {
+                    sem_post(&mutex_nodo_activo);
+                    sem_wait(&mutex_paso_consultas);
+                    paso_consultas = 0;
+                    sem_post(&mutex_paso_consultas);
+                    sem_wait(&mutex_paso_consultas);
+                    token_consulta = 0;
+                    sem_post(&mutex_paso_consultas);
+                    devolver_token_consulta();
+                    printf("[NODO %d][%s %d] -> devolviendo token consulta a %d\n", id,info->nombre, info->thread_num, token_consulta_origen);
+                    seccion_critica = 0;
+                    sem_post(&mutex_sc_sem);
+                    sem_wait(&mutex_primera_consulta);
+                    primera_consulta = 1;
+                    sem_post(&mutex_primera_consulta);
+                } else {
+                    sem_post(&mutex_nodo_activo);
+                }
             }
             sem_post(&mutex_token);
 
@@ -224,7 +266,7 @@ void *t1(void *args)
         seccion_critica = 1;
         printf("[NODO %d][%s %d] -> seccion critica\n", id, info->nombre, info->thread_num);
         // SECCIÓN CRÍTICA
-        sleep(10);
+        sleep(TIEMPO_SC);
         seccion_critica = 0;
         sem_post(&mutex_sc_sem);
 
@@ -243,7 +285,7 @@ void *t1(void *args)
         } else {
             sem_post(&mutex_quiere);
         }
-        int nodo_siguiente = buscar_nodo_siguiente();
+        int nodo_siguiente = buscar_nodo_siguiente(3);
         if (nodo_siguiente >= 0)
         {
             printf("[NODO %d][%s %d] -> peticion prioritaria en nodo %d, enviando token\n", id, info->nombre, info->thread_num, nodo_siguiente);
@@ -328,8 +370,8 @@ void *t2(void *args)
             sem_wait(&mutex_token);
             if (!(token || token_consulta))
             {
-                sem_wait(&mutex_token);
-                sem_wait(&mutex_token_consulta);
+                sem_post(&mutex_token);
+                sem_post(&mutex_token_consulta);
                 printf("[NODO %d][%s %d] -> no hay token, realizando solicitud\n", id, info->nombre, info->thread_num);
                 struct msg_nodo msg_token = (const struct msg_nodo){0};
                 // Recibir token
@@ -351,8 +393,8 @@ void *t2(void *args)
                     sem_post(&mutex_token);
                 }
             } else {
-                sem_wait(&mutex_token);
-                sem_wait(&mutex_token_consulta); 
+                sem_post(&mutex_token);
+                sem_post(&mutex_token_consulta); 
             }
 
             sem_wait(&mutex_quiere);
@@ -363,11 +405,16 @@ void *t2(void *args)
                 sem_wait(&mutex_token_consulta);
                 if (token_consulta)
                 {   
-                    sem_post(&mutex_token_consulta);
                     printf("[NODO %d][%s %d] -> devolviendo token consulta\n", id, info->nombre, info->thread_num);
                     token_consulta = 0;
+                    sem_post(&mutex_token_consulta);
                     devolver_token_consulta();
+                } else {
+                    sem_post(&mutex_token_consulta);
                 }
+                sem_wait(&mutex_paso_consultas);
+                paso_consultas = 0;
+                sem_post(&mutex_paso_consultas);
                 proceso_despertado = 1;
                 despertar_siguiente();
             } else {
@@ -415,7 +462,7 @@ void *t2(void *args)
         sem_post(&mutex_consultas_sc);
         printf("[NODO %d][%s %d] -> seccion critica\n", id, info->nombre, info->thread_num);
         // SECCIÓN CRÍTICA
-        sleep(10);
+        sleep(TIEMPO_SC);
         sem_wait(&mutex_consultas_sc);
         consultas_sc--;
         sem_post(&mutex_consultas_sc);
@@ -435,7 +482,7 @@ void *t2(void *args)
         } else {
             sem_post(&mutex_quiere);
         }
-        int nodo_siguiente = buscar_nodo_siguiente();
+        int nodo_siguiente = buscar_nodo_siguiente(2);
         sem_wait(&mutex_quiere);
         if (nodo_siguiente >= 0 || quiere[0] || quiere[1])
         {
@@ -472,7 +519,7 @@ void *t2(void *args)
                 primera_consulta = 1;
                 sem_post(&mutex_primera_consulta);
 
-                nodo_siguiente = buscar_nodo_siguiente();
+                nodo_siguiente = buscar_nodo_siguiente(3);
                 sem_wait(&mutex_token);
                 if (token && nodo_siguiente >= 0)
                 {
@@ -504,6 +551,12 @@ void *t2(void *args)
             }
         } else {
             sem_post(&mutex_quiere);
+            if(!procesos_quieren()) {
+                sem_wait(&mutex_nodo_activo);
+                nodo_activo = 0;
+                printf("[NODO %d][%s %d] -> nodo en espera\n", id, info->nombre, info->thread_num);
+                sem_post(&mutex_nodo_activo);
+            }
         }
     }
 }
@@ -537,8 +590,41 @@ void receptor()
             quitar_lista(msg_peticion.id_nodo_origen);
             if (lista_vacia())
             {
-                printf("[NODO %d][RECEPTOR] -> lista vacia, despertando ultima consulta\n", id);
-                sem_post(&lista_vacia_sem);
+                if(nodo_activo) {
+                    printf("[NODO %d][RECEPTOR] -> lista vacia, despertando ultima consulta\n", id);
+                    sem_post(&lista_vacia_sem);
+                } else {
+                    printf("[NODO %d][RECEPTOR] -> lista vacia, cerrando consultas\n", id);
+                    sem_wait(&mutex_paso_consultas);
+                    paso_consultas = 0;
+                    sem_post(&mutex_paso_consultas);
+                    seccion_critica = 0;
+                    sem_post(&mutex_sc_sem);
+                    sem_wait(&mutex_primera_consulta);
+                    primera_consulta = 1;
+                    sem_post(&mutex_primera_consulta);
+
+                    int nodo_siguiente = buscar_nodo_siguiente(3);
+                    sem_wait(&mutex_token);
+                    if (token && nodo_siguiente >= 0)
+                    {
+                        printf("[NODO %d][RECEPTOR] -> peticion prioritaria en nodo %d, enviando token\n", id, nodo_siguiente);
+                        token = 0;
+                        sem_post(&mutex_token);
+                        enviar_token(nodo_siguiente);
+                    } else {
+                        sem_post(&mutex_token);
+                    }
+                    if (procesos_quieren())
+                    {
+                        if (nodo_siguiente >= 0)
+                        {
+                            hacer_peticiones();
+                        }
+                        printf("[NODO %d][RECEPTOR] -> despertando siguiente\n", id);
+                        despertar_siguiente();
+                    }
+                }
             }
         }
         else
@@ -547,8 +633,22 @@ void receptor()
             // Actualizamos el vector de peticiones
             vector_peticiones[msg_peticion.prioridad_origen][msg_peticion.id_nodo_origen] = MAX(vector_peticiones[msg_peticion.prioridad_origen][msg_peticion.id_nodo_origen], msg_peticion.num_peticion_nodo_origen);
             // Pasamos el token si procede
-            
-            if (token && !seccion_critica && prioridad_superior(msg_peticion.prioridad_origen) && (vector_peticiones[msg_peticion.prioridad_origen][msg_peticion.id_nodo_origen] > vector_atendidas[msg_peticion.prioridad_origen][msg_peticion.id_nodo_origen]))
+            if (token_consulta && !nodo_activo && msg_peticion.prioridad_origen < 2) {
+                sem_wait(&mutex_paso_consultas);
+                paso_consultas = 0;
+                sem_post(&mutex_paso_consultas);
+                sem_wait(&mutex_token_consulta);
+                token_consulta = 0;
+                sem_post(&mutex_token_consulta);
+                devolver_token_consulta();
+                printf("[NODO %d][RECEPTOR] -> devolviendo token consulta a %d\n", id, token_consulta_origen);
+                seccion_critica = 0;
+                sem_post(&mutex_sc_sem);
+                sem_wait(&mutex_primera_consulta);
+                primera_consulta = 1;
+                sem_post(&mutex_primera_consulta);
+            }
+            else if (token && !seccion_critica && prioridad_superior(msg_peticion.prioridad_origen) && (vector_peticiones[msg_peticion.prioridad_origen][msg_peticion.id_nodo_origen] > vector_atendidas[msg_peticion.prioridad_origen][msg_peticion.id_nodo_origen]))
             {
                 printf("[NODO %d][RECEPTOR] -> enviando token a nodo %d\n", id, msg_peticion.id_nodo_origen);
                 sem_wait(&mutex_token);

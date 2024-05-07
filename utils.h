@@ -12,6 +12,7 @@
 #define CONSULTAS 15      // Mensajes de solicitud de consultas
 
 #define MAX(a, b) (((a) > (b)) ? (a) : (b)) // Cálculo de valor máximo entre dos variables
+#define MIN(a, b) (((a) < (b)) ? (a) : (b))
 
 // Estructura de los mensajes
 struct msg_nodo
