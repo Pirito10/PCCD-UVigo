@@ -291,6 +291,12 @@ void *t2(void *args)
             {
                 sem_post(&cola_t2_sem);
             }
+            // ENVIAR TOKENS LECTOR PENDIENTES
+            for(int i = (id + 1) % N; i != id; i = (i + 1) % N) {
+                if(vector_peticiones[2][i] > vector_atendidas[2][i]) {
+                    enviar_token_consulta(i);
+                }
+            }
         }
 
         consultas_sc++;
