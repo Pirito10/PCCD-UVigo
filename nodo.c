@@ -30,6 +30,10 @@ int quiere[3] = {0, 0, 0}; // Vector de procesos que quieren SC por cada priorid
 
 sem_t mutex_sc_sem; // Semáforo de exclusión mutua de SC
 
+sem_t mutex_token, mutex_token_consulta, mutex_vector_peticiones, mutex_atendidas;
+sem_t mutex_nodo_activo, mutex_paso_consultas, mutex_primera_consulta, mutex_consultas_sc;
+sem_t mutex_cola_t0, mutex_cola_t1, mutex_cola_t2;
+
 // Hilo de tipo PAGOS/ANULACIONES
 void *t0(void *args)
 {
@@ -468,6 +472,19 @@ int main(int argc, char *argv[])
     sem_init(&cola_t1_sem, 0, 0);
     sem_init(&cola_t2_sem, 0, 0);
     sem_init(&lista_vacia_sem, 0, 0);
+
+    // Inicializamos los semaforos mutex variables
+    sem_init(&mutex_token, 0, 1);
+    sem_init(&mutex_token_consulta, 0, 1);
+    sem_init(&mutex_vector_peticiones, 0, 1);
+    sem_init(&mutex_atendidas, 0, 1);
+    sem_init(&mutex_nodo_activo, 0, 1);
+    sem_init(&mutex_paso_consultas, 0, 1);
+    sem_init(&mutex_primera_consulta, 0, 1);
+    sem_init(&mutex_consultas_sc, 0, 1);
+    sem_init(&mutex_cola_t0, 0, 1);
+    sem_init(&mutex_cola_t1, 0, 1);
+    sem_init(&mutex_cola_t2, 0, 1);
 
     // Incializamos la cola de mensajes del nodo
     cola_msg = msgget(1000 + id, 0666 | IPC_CREAT);
