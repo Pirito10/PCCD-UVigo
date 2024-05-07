@@ -16,6 +16,8 @@ extern int token_consulta;
 
 struct NodoLista *nodo_cabeza = NULL; // Puntero que apunta al primer nodo de la lista
 
+extern sem_t mutex_lista; // Semáforo mutex para la lista
+
 /**
  * Envía el token a otro nodo especificado
  * @param id_nodo ID del nodo al que se envía el token
@@ -174,7 +176,7 @@ void devolver_token_consulta()
     msg_nodo.id_nodo_origen = id;
     msg_nodo.devolucion = 1;
 
-        for (int j = 0; j < 3; j++)
+    for (int j = 0; j < 3; j++)
     {
         for (int i = 0; i < N; i++)
         {
@@ -221,6 +223,7 @@ void anadir_lista(int id)
     {
         // Creamos un nodo como primer elemento
         struct NodoLista *nodoNuevo = (struct NodoLista *)malloc(sizeof(struct NodoLista));
+        sem_wait(&mutex_lista);
         nodoNuevo->sig = NULL;
         nodoNuevo->id = id;
         nodo_cabeza = nodoNuevo;
@@ -230,10 +233,12 @@ void anadir_lista(int id)
     {
         // Insertamos un nodo en la lista
         struct NodoLista *nodoNuevo = (struct NodoLista *)malloc(sizeof(struct NodoLista));
+        sem_wait(&mutex_lista);
         nodoNuevo->sig = nodo_cabeza;
         nodoNuevo->id = id;
         nodo_cabeza = nodoNuevo;
     }
+    sem_post(&mutex_lista);
 }
 
 /**
@@ -248,6 +253,7 @@ void quitar_lista(int id)
         return;
     }
 
+    sem_wait(&mutex_lista);
     // Obtenemos el primer elemento de la lista, y creamos un nodo auxiliar
     struct NodoLista *nodo_actual = nodo_cabeza;
     struct NodoLista *nodo_anterior = NULL;
@@ -262,6 +268,7 @@ void quitar_lista(int id)
     // Si no se encuentra, no hacemos nada
     if (nodo_actual == NULL)
     {
+        sem_post(&mutex_lista);
         return;
     }
 
@@ -274,7 +281,7 @@ void quitar_lista(int id)
     {
         nodo_anterior->sig = nodo_actual->sig;
     }
-
+    sem_post(&mutex_lista);
     // Liberamos la memoria ocupada por el nodo
     free(nodo_actual);
 
@@ -287,12 +294,15 @@ void quitar_lista(int id)
  */
 int lista_vacia()
 {
+    sem_wait(&mutex_lista);
     if (nodo_cabeza == NULL)
     {
+        sem_post(&mutex_lista);
         return 1;
     }
     else
     {
+        sem_post(&mutex_lista);
         return 0;
     }
 }
