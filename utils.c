@@ -16,6 +16,8 @@ extern int token_consulta;
 
 struct NodoLista *nodo_cabeza = NULL; // Puntero que apunta al primer nodo de la lista
 
+extern sem_t mutex_lista;   //Semáforo mutex para la lista
+
 /**
  * Envía el token a otro nodo especificado
  * @param id_nodo ID del nodo al que se envía el token
@@ -216,6 +218,7 @@ void enviar_token_consulta(int id_nodo)
  */
 void anadir_lista(int id)
 {
+    sem_wait(&mutex_lista);
     // Si la lista está vacía
     if (lista_vacia() == 1)
     {
@@ -234,6 +237,7 @@ void anadir_lista(int id)
         nodoNuevo->id = id;
         nodo_cabeza = nodoNuevo;
     }
+    sem_post(&mutex_lista);
 }
 
 /**
@@ -242,9 +246,11 @@ void anadir_lista(int id)
  */
 void quitar_lista(int id)
 {
+    sem_wait(&mutex_lista);
     // Si la lista está vacía, no hacemos nada
     if (lista_vacia() == 1)
     {
+        sem_post(&mutex_lista);
         return;
     }
 
@@ -262,6 +268,7 @@ void quitar_lista(int id)
     // Si no se encuentra, no hacemos nada
     if (nodo_actual == NULL)
     {
+        sem_post(&mutex_lista);
         return;
     }
 
@@ -278,6 +285,7 @@ void quitar_lista(int id)
     // Liberamos la memoria ocupada por el nodo
     free(nodo_actual);
 
+    sem_post(&mutex_lista);
     return;
 }
 
@@ -287,12 +295,15 @@ void quitar_lista(int id)
  */
 int lista_vacia()
 {
+    sem_wait(&mutex_lista);
     if (nodo_cabeza == NULL)
     {
+        sem_post(&mutex_lista);
         return 1;
     }
     else
     {
+        sem_post(&mutex_lista);
         return 0;
     }
 }

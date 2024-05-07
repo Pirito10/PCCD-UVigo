@@ -34,6 +34,8 @@ sem_t mutex_quiere, mutex_token, mutex_token_consulta, mutex_vector_peticiones, 
 sem_t mutex_nodo_activo, mutex_paso_consultas, mutex_primera_consulta, mutex_consultas_sc;
 sem_t mutex_cola_t0, mutex_cola_t1, mutex_cola_t2;
 
+sem_t mutex_lista;  //Semáforo para controlar la exclusión mutua de la lista
+
 // Hilo de tipo PAGOS/ANULACIONES
 void *t0(void *args)
 {
@@ -486,6 +488,9 @@ int main(int argc, char *argv[])
     sem_init(&mutex_cola_t0, 0, 1);
     sem_init(&mutex_cola_t1, 0, 1);
     sem_init(&mutex_cola_t2, 0, 1);
+
+    //Inicializamos el semaforo de la lista
+    sem_init(&mutex_lista, 0, 1);
 
     // Incializamos la cola de mensajes del nodo
     cola_msg = msgget(1000 + id, 0666 | IPC_CREAT);
