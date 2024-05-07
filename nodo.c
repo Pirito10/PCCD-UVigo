@@ -383,10 +383,11 @@ void receptor()
         if (msg_peticion.devolucion)
         {
             printf("[NODO %d][RECEPTOR] -> devolucion token consultas de nodo %d\n", id, msg_peticion.id_nodo_origen);
+            actualizar_atendidas(msg_peticion.vector_atendidas);
             quitar_lista(msg_peticion.id_nodo_origen);
             if (lista_vacia())
             {
-                printf("[NODO %d][RECEPTOR] -> lista vacia, despertando ultima consulta %d\n", id, msg_peticion.id_nodo_origen);
+                printf("[NODO %d][RECEPTOR] -> lista vacia, despertando ultima consulta\n", id);
                 sem_post(&lista_vacia_sem);
             }
         }

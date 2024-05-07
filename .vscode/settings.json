@@ -13,6 +13,7 @@
         "semaphore.h": "c",
         "unistd.h": "c",
         "types.h": "c",
-        "lista-testigo-copia.h": "c"
+        "lista-testigo-copia.h": "c",
+        "utils.h": "c"
     }
 }

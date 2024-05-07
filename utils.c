@@ -174,6 +174,14 @@ void devolver_token_consulta()
     msg_nodo.id_nodo_origen = id;
     msg_nodo.devolucion = 1;
 
+        for (int j = 0; j < 3; j++)
+    {
+        for (int i = 0; i < N; i++)
+        {
+            // Introducimos el vector de atendidas en el mensaje
+            msg_nodo.vector_atendidas[j][i] = vector_atendidas[j][i];
+        }
+    }
     // Enviamos el mensaje con el testigo consulta
     int msgid = msgget(1000 + token_consulta_origen, 0666);
     msgsnd(msgid, &msg_nodo, sizeof(msg_nodo), 0);
