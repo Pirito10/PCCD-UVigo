@@ -3,9 +3,9 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/msg.h>
 #include <time.h>
 #include <unistd.h>
+#include <sys/msg.h>
 
 // Estructura de los mensajes
 struct msg_nodo
@@ -84,8 +84,8 @@ int main(int argc, char *argv[])
             continue;
         }
 
+        // Obtenemos el tipo de solicitud
         char *solicitud;
-
         switch (tipo_solicitud)
         {
         case 1:
@@ -103,11 +103,9 @@ int main(int argc, char *argv[])
         case 5:
             solicitud = "CONSULTA";
             break;
-        default:
-            break;
         }
 
-        printf("Solicitud de tipo %s enviada al nodo %d\n", solicitud, ID);
+        printf("[%d] Solicitud de tipo %s enviada al nodo con ID %d\n", i + 1, solicitud, ID);
 
         // Generamos un tiempo de espera aleatorio, entre 0 y max_espera
         int espera = (rand() % (max_espera + 1));
