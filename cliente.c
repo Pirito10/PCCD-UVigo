@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
         }
 
         // Tomamos el tipo de solicitud
-        printf("Selecciona el tipo de solicitud:\n- Pago: 1\n- Anulación: 2\n- Reserva: 3\n- Administración: 4\n- Consulta: 5\n");
+        printf("Selecciona el tipo de solicitud:\n- Pago --> 1\n- Anulación --> 2\n- Reserva --> 3\n- Administración --> 4\n- Consulta --> 5\n");
         scanf("%d", &tipo_solicitud);
 
         // Obtenemos la cola de mensajes del nodo
@@ -66,6 +66,27 @@ int main(int argc, char *argv[])
             continue;
         }
 
-        printf("Solicitud enviada\n\n");
+        // Obtenemos el tipo de solicitud
+        char *solicitud;
+        switch (tipo_solicitud)
+        {
+        case 1:
+            solicitud = "PAGO";
+            break;
+        case 2:
+            solicitud = "ANULACION";
+            break;
+        case 3:
+            solicitud = "RESERVA";
+            break;
+        case 4:
+            solicitud = "ADMIN";
+            break;
+        case 5:
+            solicitud = "CONSULTA";
+            break;
+        }
+
+        printf("Solicitud de tipo %s enviada al nodo con ID %d\n\n", solicitud, ID);
     }
 }
