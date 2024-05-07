@@ -299,8 +299,8 @@ void *t2(void *args)
                 printf("[NODO %d][%s %d] -> solicitando token\n", id, info->nombre, info->thread_num);
                 broadcast(2);
             }
-            sem_wait(&mutex_token);
-            sem_wait(&mutex_token_consulta);
+            sem_post(&mutex_token);
+            sem_post(&mutex_token_consulta);
 
             sem_wait(&mutex_nodo_activo);
             if (nodo_activo)
