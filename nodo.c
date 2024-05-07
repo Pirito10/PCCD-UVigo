@@ -110,6 +110,17 @@ void *t0(void *args)
             // Recibir token
             msgrcv(cola_msg, &msg_token, sizeof(msg_token), TOKEN, 0);
             actualizar_atendidas(msg_token.vector_atendidas);
+            while (msg_token.consulta)
+            {
+                msg_token = (const struct msg_nodo){0};
+                printf("[NODO %d][%s %d] -> token consulta recibido, devolviendo\n", id, info->nombre, info->thread_num);
+                sem_wait(&mutex_token_consulta);
+                token_consulta_origen = msg_token.id_nodo_origen;
+                sem_post(&mutex_token_consulta);
+                devolver_token_consulta();
+                msgrcv(cola_msg, &msg_token, sizeof(msg_token), TOKEN, 0);
+                actualizar_atendidas(msg_token.vector_atendidas);
+            }
             sem_wait(&mutex_token);
             token = 1;
             sem_post(&mutex_token);
@@ -243,6 +254,17 @@ void *t1(void *args)
                 // Recibir token
                 msgrcv(cola_msg, &msg_token, sizeof(msg_token), TOKEN, 0);
                 actualizar_atendidas(msg_token.vector_atendidas);
+                while (msg_token.consulta)
+                {
+                    msg_token = (const struct msg_nodo){0};
+                    printf("[NODO %d][%s %d] -> token consulta recibido, devolviendo\n", id, info->nombre, info->thread_num);
+                    sem_wait(&mutex_token_consulta);
+                    token_consulta_origen = msg_token.id_nodo_origen;
+                    sem_post(&mutex_token_consulta);
+                    devolver_token_consulta();
+                    msgrcv(cola_msg, &msg_token, sizeof(msg_token), TOKEN, 0);
+                    actualizar_atendidas(msg_token.vector_atendidas);
+                }
                 sem_wait(&mutex_token);
                 token = 1;
                 sem_post(&mutex_token);
