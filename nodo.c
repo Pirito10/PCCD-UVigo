@@ -16,7 +16,7 @@
 #include <time.h>   //Metricas
 #include "metricas.c"
 
-clock_t inicio1_t0, fin1_t0, inicio2_t0, fin2_t0, inicio_t1, fin_t1, inicio_t2, fin_2;
+clock_t inicio1_t0, fin1_t0, inicio2_t0, fin2_t0, inicio1_t1, fin1_t1, inicio2_t1, fin2_t1, inicio1_t2, fin1_2, inicio2_t2, fin2_2;
 double tiempo_t0, tiempo_t1, double_t2;
 
 int token, token_consulta, id, seccion_critica = 0; // Testigo, testigo consulta, ID del nodo y estado de la SC
@@ -274,6 +274,11 @@ void *t1(void *args)
             }
 
             sem_wait(&mutex_token);
+            
+            if(token){
+                inicio1_t1 = clock();
+            }
+
             if (!token)
             {
                 sem_post(&mutex_token);
@@ -281,6 +286,7 @@ void *t1(void *args)
                 struct msg_nodo msg_token = (const struct msg_nodo){0};
                 // Recibir token
                 msgrcv(cola_msg, &msg_token, sizeof(msg_token), TOKEN, 0);
+                inicio1_t1 = clock();
                 actualizar_atendidas(msg_token.vector_atendidas);
                 while (msg_token.consulta)
                 {
@@ -314,9 +320,12 @@ void *t1(void *args)
 
         sem_wait(&mutex_sc_sem);
         seccion_critica = 1;
+        fin1_t1 = clock();
+        escribir_tiempo(diferencia_tiempo(inicio1_t1, fin1_t1), "antes_sc_t1");
         printf("[NODO %d][%s %d] -> seccion critica\n", id, info->nombre, info->thread_num);
         // SECCIÓN CRÍTICA
         sleep(TIEMPO_SC);
+        inicio2_t1 = clock();
         seccion_critica = 0;
         sem_post(&mutex_sc_sem);
 
@@ -343,6 +352,9 @@ void *t1(void *args)
             token = 0;
             sem_post(&mutex_token);
             enviar_token(nodo_siguiente);
+            fin2_t1 = clock();
+            escribir_tiempo(diferencia_tiempo(inicio2_t1, fin2_t1), "despues_sc_t1");
+
         }
         if (procesos_quieren())
         {
@@ -352,6 +364,9 @@ void *t1(void *args)
             }
             printf("[NODO %d][%s %d] -> despertando siguiente\n", id, info->nombre, info->thread_num);
             despertar_siguiente();
+
+            fin2_t1 = clock();
+            escribir_tiempo(diferencia_tiempo(inicio2_t1, fin2_t1), "despues_sc_t1");
         }
         else
         {
@@ -359,6 +374,8 @@ void *t1(void *args)
             sem_wait(&mutex_nodo_activo);
             nodo_activo = 0;
             sem_post(&mutex_nodo_activo);
+            fin2_t1 = clock();
+            escribir_tiempo(diferencia_tiempo(inicio2_t1, fin2_t1), "despues_sc_t1");
         }
     }
 }
