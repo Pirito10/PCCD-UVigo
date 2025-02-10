@@ -1,6 +1,6 @@
 #ifndef UTILS_H
 
-#define N 3 // Número de nodos
+#define N 4 // Número de nodos
 
 #define TOKEN 1           // Mensajes de envío de testigo
 #define REQUEST 2         // Mensajes de solicitud de testigo
