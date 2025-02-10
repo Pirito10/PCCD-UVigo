@@ -29,7 +29,7 @@ fi
 for ((i = 0; i < N; i++)); do
   echo "Iniciado nodo con ID=$i con un timeout de $TIMEOUT segundos"
   # Ejecutar en segundo plano con timeout
-  timeout $TIMEOUT ./nodo $i $PROCESOS_PAGOS $PROCESOS_ANULACIONES $PROCESOS_RESERVAS $PROCESOS_ADMINISTRACION $PROCESOS_CONSULTAS &
+  timeout $TIMEOUT ./src/nodo $i $PROCESOS_PAGOS $PROCESOS_ANULACIONES $PROCESOS_RESERVAS $PROCESOS_ADMINISTRACION $PROCESOS_CONSULTAS &
 done
 
 echo ""
