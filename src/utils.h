@@ -26,7 +26,8 @@ struct msg_nodo
     int vector_atendidas[3][N];   // Vector atendidas
 };
 
-struct thread_info {
+struct thread_info
+{
     int tipo;
     int thread_num;
     char nombre[16];

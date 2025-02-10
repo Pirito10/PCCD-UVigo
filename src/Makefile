@@ -33,7 +33,7 @@ $(EXEC_CLIENTE_RAND): $(SRC_CLIENTE_RAND)
 $(EXEC_KILL): $(SRC_KILL)
 	$(CC) $(CFLAGS) -o $(EXEC_KILL) $(SRC_KILL)
 
-# Regla para limpiar archivos intermedios y ejecutables
+# Regla para limpiar archivos ejecutables
 clean:
 	rm -f $(EXEC_NODO) $(EXEC_CLIENTE) $(EXEC_CLIENTE_RAND) $(EXEC_KILL)
 

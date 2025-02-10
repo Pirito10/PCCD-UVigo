@@ -1,8 +1,6 @@
-// Sin esta línea se rompe mi entorno, se puede suprimir en la entrega final pero la necesito para debuggear -Manu
-#define _GNU_SOURCE
-
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <pthread.h>
 #include <semaphore.h>
 #include <signal.h>
@@ -36,7 +34,7 @@ sem_t mutex_quiere, mutex_token, mutex_token_consulta, mutex_vector_peticiones, 
 sem_t mutex_nodo_activo, mutex_paso_consultas, mutex_primera_consulta, mutex_consultas_sc;
 sem_t mutex_cola_t0, mutex_cola_t1, mutex_cola_t2;
 
-sem_t mutex_lista;  //Semáforo para controlar la exclusión mutua de la lista
+sem_t mutex_lista; // Semáforo para controlar la exclusión mutua de la lista
 
 // Hilo de tipo PAGOS/ANULACIONES
 void *t0(void *args)
@@ -61,7 +59,8 @@ void *t0(void *args)
             printf("[NODO %d][%s %d] -> solicitando token\n", id, info->nombre, info->thread_num);
             broadcast(0);
             sem_wait(&mutex_nodo_activo);
-            if(!nodo_activo && token_consulta) {
+            if (!nodo_activo && token_consulta)
+            {
                 sem_post(&mutex_nodo_activo);
                 sem_wait(&mutex_paso_consultas);
                 paso_consultas = 0;
@@ -70,16 +69,20 @@ void *t0(void *args)
                 token_consulta = 0;
                 sem_post(&mutex_paso_consultas);
                 devolver_token_consulta();
-                printf("[NODO %d][%s %d] -> devolviendo token consulta a %d\n", id,info->nombre, info->thread_num, token_consulta_origen);
+                printf("[NODO %d][%s %d] -> devolviendo token consulta a %d\n", id, info->nombre, info->thread_num, token_consulta_origen);
                 seccion_critica = 0;
                 sem_post(&mutex_sc_sem);
                 sem_wait(&mutex_primera_consulta);
                 primera_consulta = 1;
                 sem_post(&mutex_primera_consulta);
-            } else {
+            }
+            else
+            {
                 sem_post(&mutex_nodo_activo);
             }
-        } else {
+        }
+        else
+        {
             sem_post(&mutex_token);
         }
 
@@ -125,7 +128,9 @@ void *t0(void *args)
             token = 1;
             sem_post(&mutex_token);
             printf("[NODO %d][%s %d] -> token recibido\n", id, info->nombre, info->thread_num);
-        } else {
+        }
+        else
+        {
             sem_post(&mutex_token);
         }
 
@@ -149,7 +154,9 @@ void *t0(void *args)
             vector_atendidas[0][id] = vector_peticiones[0][id];
             sem_post(&mutex_vector_peticiones);
             sem_post(&mutex_atendidas);
-        } else {
+        }
+        else
+        {
             sem_post(&mutex_quiere);
         }
         int nodo_siguiente = buscar_nodo_siguiente(3);
@@ -206,7 +213,8 @@ void *t1(void *args)
                 printf("[NODO %d][%s %d] -> solicitando token\n", id, info->nombre, info->thread_num);
                 broadcast(1);
                 sem_wait(&mutex_nodo_activo);
-                if(!nodo_activo && token_consulta) {
+                if (!nodo_activo && token_consulta)
+                {
                     sem_post(&mutex_nodo_activo);
                     sem_wait(&mutex_paso_consultas);
                     paso_consultas = 0;
@@ -215,13 +223,15 @@ void *t1(void *args)
                     token_consulta = 0;
                     sem_post(&mutex_paso_consultas);
                     devolver_token_consulta();
-                    printf("[NODO %d][%s %d] -> devolviendo token consulta a %d\n", id,info->nombre, info->thread_num, token_consulta_origen);
+                    printf("[NODO %d][%s %d] -> devolviendo token consulta a %d\n", id, info->nombre, info->thread_num, token_consulta_origen);
                     seccion_critica = 0;
                     sem_post(&mutex_sc_sem);
                     sem_wait(&mutex_primera_consulta);
                     primera_consulta = 1;
                     sem_post(&mutex_primera_consulta);
-                } else {
+                }
+                else
+                {
                     sem_post(&mutex_nodo_activo);
                 }
             }
@@ -269,7 +279,9 @@ void *t1(void *args)
                 token = 1;
                 sem_post(&mutex_token);
                 printf("[NODO %d][%s %d] -> token recibido\n", id, info->nombre, info->thread_num);
-            } else {
+            }
+            else
+            {
                 sem_post(&mutex_token);
             }
             sem_wait(&mutex_quiere);
@@ -279,7 +291,9 @@ void *t1(void *args)
                 printf("[NODO %d][%s %d] -> proceso prioritario a la espera, dando paso\n", id, info->nombre, info->thread_num);
                 proceso_despertado = 1;
                 despertar_siguiente();
-            } else {
+            }
+            else
+            {
                 sem_post(&mutex_quiere);
             }
         } while (proceso_despertado);
@@ -304,7 +318,9 @@ void *t1(void *args)
             vector_atendidas[1][id] = vector_peticiones[1][id];
             sem_post(&mutex_vector_peticiones);
             sem_post(&mutex_atendidas);
-        } else {
+        }
+        else
+        {
             sem_post(&mutex_quiere);
         }
         int nodo_siguiente = buscar_nodo_siguiente(3);
@@ -377,7 +393,9 @@ void *t2(void *args)
                     printf("[NODO %d][%s %d] -> nodo activo, esperando ser atendido\n", id, info->nombre, info->thread_num);
                     cola_t2++;
                     sem_wait(&cola_t2_sem);
-                } else {
+                }
+                else
+                {
                     sem_post(&mutex_paso_consultas);
                 }
             }
@@ -414,9 +432,11 @@ void *t2(void *args)
                     token = 1;
                     sem_post(&mutex_token);
                 }
-            } else {
+            }
+            else
+            {
                 sem_post(&mutex_token);
-                sem_post(&mutex_token_consulta); 
+                sem_post(&mutex_token_consulta);
             }
 
             sem_wait(&mutex_quiere);
@@ -426,12 +446,14 @@ void *t2(void *args)
                 printf("[NODO %d][%s %d] -> proceso prioritario a la espera, dando paso\n", id, info->nombre, info->thread_num);
                 sem_wait(&mutex_token_consulta);
                 if (token_consulta)
-                {   
+                {
                     printf("[NODO %d][%s %d] -> devolviendo token consulta\n", id, info->nombre, info->thread_num);
                     token_consulta = 0;
                     sem_post(&mutex_token_consulta);
                     devolver_token_consulta();
-                } else {
+                }
+                else
+                {
                     sem_post(&mutex_token_consulta);
                 }
                 sem_wait(&mutex_paso_consultas);
@@ -439,7 +461,9 @@ void *t2(void *args)
                 sem_post(&mutex_paso_consultas);
                 proceso_despertado = 1;
                 despertar_siguiente();
-            } else {
+            }
+            else
+            {
                 sem_post(&mutex_quiere);
             }
         } while (proceso_despertado);
@@ -462,20 +486,25 @@ void *t2(void *args)
             }
             sem_post(&mutex_cola_t2);
             // ENVIAR TOKENS LECTOR PENDIENTES
-            for(int i = (id + 1) % N; i != id; i = (i + 1) % N) {
+            for (int i = (id + 1) % N; i != id; i = (i + 1) % N)
+            {
                 sem_wait(&mutex_atendidas);
                 sem_wait(&mutex_vector_peticiones);
-                if(vector_peticiones[2][i] > vector_atendidas[2][i]) {
+                if (vector_peticiones[2][i] > vector_atendidas[2][i])
+                {
                     sem_post(&mutex_atendidas);
                     sem_post(&mutex_vector_peticiones);
                     enviar_token_consulta(i);
                 }
-                else {
+                else
+                {
                     sem_post(&mutex_atendidas);
                     sem_post(&mutex_vector_peticiones);
                 }
             }
-        } else {
+        }
+        else
+        {
             sem_post(&mutex_primera_consulta);
         }
 
@@ -501,7 +530,9 @@ void *t2(void *args)
             vector_atendidas[2][id] = vector_peticiones[2][id];
             sem_post(&mutex_vector_peticiones);
             sem_post(&mutex_atendidas);
-        } else {
+        }
+        else
+        {
             sem_post(&mutex_quiere);
         }
         int nodo_siguiente = buscar_nodo_siguiente(2);
@@ -549,7 +580,9 @@ void *t2(void *args)
                     token = 0;
                     sem_post(&mutex_token);
                     enviar_token(nodo_siguiente);
-                } else {
+                }
+                else
+                {
                     sem_post(&mutex_token);
                 }
                 if (procesos_quieren())
@@ -568,12 +601,17 @@ void *t2(void *args)
                     nodo_activo = 0;
                     sem_post(&mutex_nodo_activo);
                 }
-            } else {
+            }
+            else
+            {
                 sem_post(&mutex_consultas_sc);
             }
-        } else {
+        }
+        else
+        {
             sem_post(&mutex_quiere);
-            if(!procesos_quieren()) {
+            if (!procesos_quieren())
+            {
                 sem_wait(&mutex_nodo_activo);
                 nodo_activo = 0;
                 printf("[NODO %d][%s %d] -> nodo en espera\n", id, info->nombre, info->thread_num);
@@ -612,10 +650,13 @@ void receptor()
             quitar_lista(msg_peticion.id_nodo_origen);
             if (lista_vacia())
             {
-                if(nodo_activo) {
+                if (nodo_activo)
+                {
                     printf("[NODO %d][RECEPTOR] -> lista vacia, despertando ultima consulta\n", id);
                     sem_post(&lista_vacia_sem);
-                } else {
+                }
+                else
+                {
                     printf("[NODO %d][RECEPTOR] -> lista vacia, cerrando consultas\n", id);
                     sem_wait(&mutex_paso_consultas);
                     paso_consultas = 0;
@@ -634,7 +675,9 @@ void receptor()
                         token = 0;
                         sem_post(&mutex_token);
                         enviar_token(nodo_siguiente);
-                    } else {
+                    }
+                    else
+                    {
                         sem_post(&mutex_token);
                     }
                     if (procesos_quieren())
@@ -655,7 +698,8 @@ void receptor()
             // Actualizamos el vector de peticiones
             vector_peticiones[msg_peticion.prioridad_origen][msg_peticion.id_nodo_origen] = MAX(vector_peticiones[msg_peticion.prioridad_origen][msg_peticion.id_nodo_origen], msg_peticion.num_peticion_nodo_origen);
             // Pasamos el token si procede
-            if (token_consulta && !nodo_activo && msg_peticion.prioridad_origen < 2) {
+            if (token_consulta && !nodo_activo && msg_peticion.prioridad_origen < 2)
+            {
                 sem_wait(&mutex_paso_consultas);
                 paso_consultas = 0;
                 sem_post(&mutex_paso_consultas);
@@ -752,7 +796,7 @@ int main(int argc, char *argv[])
     sem_init(&mutex_cola_t1, 0, 1);
     sem_init(&mutex_cola_t2, 0, 1);
 
-    //Inicializamos el semaforo de la lista
+    // Inicializamos el semaforo de la lista
     sem_init(&mutex_lista, 0, 1);
 
     // Incializamos la cola de mensajes del nodo
@@ -767,20 +811,20 @@ int main(int argc, char *argv[])
     pthread_t hilo_t0[num_hilos[0] + num_hilos[1]];
     for (int i = 0; i < num_hilos[0]; i++)
     {
-        struct thread_info *info =  malloc(sizeof(struct thread_info));
+        struct thread_info *info = malloc(sizeof(struct thread_info));
         info->thread_num = i;
         info->tipo = PAGOS;
-        strcpy(info->nombre,"PAGOS");
+        strcpy(info->nombre, "PAGOS");
         pthread_create(&hilo_t0[i], NULL, t0, info);
     }
 
     // Creamos los hilos de tipo ANULACIONES
     for (int i = num_hilos[0]; i < (num_hilos[0] + num_hilos[1]); i++)
     {
-        struct thread_info *info =  malloc(sizeof(struct thread_info));
+        struct thread_info *info = malloc(sizeof(struct thread_info));
         info->thread_num = i - num_hilos[0];
         info->tipo = ANULACIONES;
-        strcpy(info->nombre,"ANULACIONES");
+        strcpy(info->nombre, "ANULACIONES");
         pthread_create(&hilo_t0[i], NULL, t0, info);
     }
 
@@ -788,20 +832,20 @@ int main(int argc, char *argv[])
     pthread_t hilo_t1[num_hilos[2] + num_hilos[3]];
     for (int i = 0; i < num_hilos[2]; i++)
     {
-        struct thread_info *info =  malloc(sizeof(struct thread_info));
+        struct thread_info *info = malloc(sizeof(struct thread_info));
         info->thread_num = i;
         info->tipo = RESERVAS;
-        strcpy(info->nombre,"RESERVAS");
+        strcpy(info->nombre, "RESERVAS");
         pthread_create(&hilo_t1[i], NULL, t1, info);
     }
 
     // Creamos los hilos de tipo ADMINISTRACION
-    for (int i = num_hilos[2]; i <(num_hilos[2] + num_hilos[3]); i++)
+    for (int i = num_hilos[2]; i < (num_hilos[2] + num_hilos[3]); i++)
     {
-        struct thread_info *info =  malloc(sizeof(struct thread_info));
+        struct thread_info *info = malloc(sizeof(struct thread_info));
         info->thread_num = i - num_hilos[2];
         info->tipo = ADMINISTRACION;
-        strcpy(info->nombre,"ADMINISTRACION");
+        strcpy(info->nombre, "ADMINISTRACION");
         pthread_create(&hilo_t1[3], NULL, t1, info);
     }
 
@@ -809,10 +853,10 @@ int main(int argc, char *argv[])
     pthread_t hilo_t2[num_hilos[4]];
     for (int i = 0; i < num_hilos[4]; i++)
     {
-        struct thread_info *info =  malloc(sizeof(struct thread_info));
+        struct thread_info *info = malloc(sizeof(struct thread_info));
         info->thread_num = i;
         info->tipo = CONSULTAS;
-        strcpy(info->nombre,"CONSULTAS");
+        strcpy(info->nombre, "CONSULTAS");
         pthread_create(&hilo_t2[4], NULL, t2, info);
     }
 
