@@ -87,6 +87,6 @@ After every execution, it is recommended to terminate all nodes with:
 ```
 
 ## About The Code
-Refer to [`Presentación - Diseño Avanzado`](docs/Presentación%20-%20Diseño%20Avanzado.pdf) and [`Presentación - Diseño Final`](docs/Presentación%20-%20Diseño%20Final.pdf) for a high level overview of the project.
+Refer to [`Presentación - Diseño Avanzado`](docs/Presentación%20-%20Diseño%20Avanzado.pdf) and [`Presentación - Diseño Final`](docs/Presentación%20-%20Diseño%20Final.pdf) for a high-level overview of the project.
 
 Refer to [`Especificaciones.pdf`](docs/Especificaciones.pdf), [`Documentación.pdf`](docs/Documentación.pdf), [`Requisitos.pdf`](docs/Requisitos.pdf), and [`Pruebas.pdf`](docs/Pruebas.pdf) for an in-depth explanation of the project, the different types of processses, the algorithm implementation, the priority system, how to run the system, and more.
